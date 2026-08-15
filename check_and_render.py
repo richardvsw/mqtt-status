@@ -15,9 +15,13 @@ from datetime import datetime, timezone, timedelta
 
 WIB = timezone(timedelta(hours=7))
 MQTT_PORT = 1883
-BROKERS = ["mqtt.meshnode.id", "mqtt1.meshnode.id", "mqtt2.meshnode.id", "mqtt3.meshnode.id", "mqtt4.meshnode.id"]
+# Edit brokers.json to add/remove brokers -- no code change needed, this
+# file is re-read fresh on every run.
+with open("brokers.json") as _f:
+    BROKERS = json.load(_f)
 
 HISTORY_PATH = "history.json"
+LOG_PATH = "log.jsonl"  # append-only per-run detail log -- kept separate so index.html only ever holds the current rendered state, not accumulating history
 STATE_PATH = "state.json"  # tracks current_outage_start per host, same purpose as mqtt_tap's own outage_state
 OUT_PATH = "index.html"
 HISTORY_DAYS = 90
@@ -86,6 +90,12 @@ cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_DAYS)).
 for d in [d for d in history if d < cutoff_date]:
     del history[d]
 save_json(HISTORY_PATH, history)
+
+# append this run'''s raw result to the detail log -- one line per check,
+# never rewritten/truncated (unlike history.json/state.json which hold
+# only the current rolled-up state)
+with open(LOG_PATH, "a") as f:
+    f.write(json.dumps({"ts": now, "brokers": brokers}) + "\n")
 
 day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strftime("%Y-%m-%d")
               for i in range(HISTORY_DAYS - 1, -1, -1)]
