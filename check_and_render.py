@@ -122,7 +122,8 @@ for host in BROKERS:
     b = brokers[host]
     if b["reachable"]:
         up_count += 1
-        status_label, status_class = "Operational", "up"
+        status_class = "up"
+        status_label = f"Operational · {b['latency_ms']}ms" if b["latency_ms"] is not None else "Operational"
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
         status_label, status_class = f"Down · {dur}", "down"
@@ -153,73 +154,163 @@ html = f'''<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>meshnode.id MQTT Status</title>
+<meta name="description" content="Status langsung broker MQTT publik meshnode.id">
 <meta http-equiv="refresh" content="60">
 <style>
   :root {{
-    --bg: #0b0f14; --surf: #121821; --border: #232c38; --text: #e7edf3;
-    --muted: #8a96a3;
-    --ok: #45d9ae; --ok-bg: #12271f;
-    --warn: #e3b341; --warn-bg: #2b2413;
-    --crit: #f0665a; --crit-bg: #2b1715;
-    --tooltip-bg: #1c2430;
+    --bg: #0a0d12; --bg2: #0d1117; --surf: #10151d; --surf2: #151b25; --border: #212a37; --border-soft: #1a222d;
+    --text: #eaeef3; --muted: #8b96a5; --faint: #566173;
+    --ok: #3ddc97; --ok-dim: #2a4a3d; --ok-bg: #0f2019;
+    --warn: #e8b64a; --warn-dim: #4a3d1f; --warn-bg: #241c0d;
+    --crit: #f2685c; --crit-dim: #4a2521; --crit-bg: #251311;
+    --accent: #5b8cff;
+    --tooltip-bg: #1a2230;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
   }}
   * {{ box-sizing: border-box; }}
+  html {{ color-scheme: dark; }}
   body {{
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0; min-height: 100vh; color: var(--text);
+    background:
+      radial-gradient(900px 420px at 50% -10%, rgba(91,140,255,.10), transparent 60%),
+      linear-gradient(180deg, var(--bg2), var(--bg) 340px);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }}
-  .banner {{ padding: 1.4rem 1.5rem; text-align: center; font-size: 1.15rem; font-weight: 600; }}
+  .banner {{
+    display: flex; align-items: center; justify-content: center; gap: .55rem;
+    padding: .85rem 1.2rem; text-align: center; font-size: .92rem; font-weight: 600;
+    letter-spacing: .1px; border-bottom: 1px solid var(--border-soft);
+  }}
+  .banner-icon {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; font-size: .7rem; flex-shrink: 0;
+  }}
   .banner.ok {{ background: var(--ok-bg); color: var(--ok); }}
+  .banner.ok .banner-icon {{ background: var(--ok); color: #05130d; }}
   .banner.warn {{ background: var(--warn-bg); color: var(--warn); }}
+  .banner.warn .banner-icon {{ background: var(--warn); color: #241c0d; }}
   .banner.crit {{ background: var(--crit-bg); color: var(--crit); }}
-  .wrap {{ max-width: 640px; margin: 0 auto; padding: 2rem 1.2rem; }}
-  .titlebar h1 {{ font-size: 1.15rem; margin: 0 0 .3rem; }}
-  .sub {{ color: var(--muted); font-size: .85rem; margin-bottom: 1.6rem; }}
-  .panel {{ background: var(--surf); border: 1px solid var(--border); border-radius: 10px; }}
-  .row {{ padding: .9rem 1.2rem 1rem; border-top: 1px solid var(--border); font-size: .92rem; }}
-  .row:first-child {{ border-top: none; }}
-  .row-top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: .55rem; }}
-  .row-left {{ display: flex; align-items: center; gap: .65rem; }}
-  .dot {{ width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }}
-  .dot.up {{ background: var(--ok); }}
-  .dot.down {{ background: var(--crit); }}
-  .host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; }}
-  .status {{ font-weight: 600; font-variant-numeric: tabular-nums; }}
+  .banner.crit .banner-icon {{ background: var(--crit); color: #250f0d; }}
+
+  .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
+  .titlebar {{ display: flex; align-items: baseline; gap: .55rem; margin-bottom: .35rem; }}
+  .titlebar .glyph {{ font-size: 1.25rem; line-height: 1; }}
+  .titlebar h1 {{ font-size: 1.2rem; font-weight: 650; margin: 0; letter-spacing: -.2px; }}
+  .sub {{ color: var(--muted); font-size: .86rem; margin-bottom: 1.8rem; }}
+  .sub b {{ color: var(--text); font-weight: 600; }}
+
+  /* No overflow:hidden here either -- same reason as .bars below: it
+     would clip the first row's tooltip, which sits close to the panel's
+     own top edge. .row handles its own corner rounding on first/last
+     instead of relying on the parent to clip square corners into shape. */
+  .panel {{
+    background: var(--surf); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow);
+  }}
+  .row {{
+    padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft);
+    font-size: .92rem; transition: background .12s;
+  }}
+  .row:first-child {{ border-top: none; border-top-left-radius: 14px; border-top-right-radius: 14px; }}
+  .row:last-child {{ border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }}
+  .row:hover {{ background: var(--surf2); }}
+  .row-top {{ display: flex; justify-content: space-between; align-items: center; gap: .8rem; margin-bottom: .65rem; }}
+  .row-left {{ display: flex; align-items: center; gap: .7rem; min-width: 0; }}
+  .dot {{ position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }}
+  .dot.up {{ background: var(--ok); box-shadow: 0 0 0 3px var(--ok-dim); }}
+  .dot.up::after {{
+    content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ok);
+    animation: pulse 2.2s ease-out infinite;
+  }}
+  .dot.down {{ background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }}
+  @keyframes pulse {{
+    0% {{ transform: scale(.6); opacity: .8; }}
+    100% {{ transform: scale(2.1); opacity: 0; }}
+  }}
+  .host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .status {{ font-weight: 600; font-variant-numeric: tabular-nums; font-size: .84rem; flex-shrink: 0; }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
-  .bars {{ display: flex; gap: 1px; height: 28px; overflow: hidden; }}
-  .bar {{ flex: 1 1 0; min-width: 0; border-radius: 1px; position: relative; cursor: pointer; }}
-  @media (min-width: 480px) {{ .bars {{ gap: 2px; }} .bar {{ border-radius: 2px; }} }}
-  .bar.up {{ background: var(--ok); }}
+
+  /* No overflow:hidden here -- that would also clip the tooltip
+     pseudo-elements below, which sit above each .bar's own box and are
+     positioned relative to it, not to .bars. Rounding is done on the
+     first/last .bar directly instead, so the strip still reads as one
+     rounded pill without needing to clip anything. */
+  .bars {{ display: flex; gap: 2px; height: 30px; }}
+  .bar {{ flex: 1 1 0; min-width: 0; position: relative; cursor: pointer; }}
+  .bar:first-child {{ border-top-left-radius: 4px; border-bottom-left-radius: 4px; }}
+  .bar:last-child {{ border-top-right-radius: 4px; border-bottom-right-radius: 4px; }}
+  .bar.up {{ background: var(--ok); opacity: .9; }}
   .bar.warn {{ background: var(--warn); }}
   .bar.down {{ background: var(--crit); }}
   .bar.nodata {{ background: var(--border); }}
-  .bar:hover {{ opacity: .75; }}
+  .bar:hover, .bar.active {{ opacity: 1; transform: scaleY(1.06); }}
   .bar::after {{
-    content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%);
     background: var(--tooltip-bg); color: var(--text); border: 1px solid var(--border);
-    padding: .35rem .6rem; border-radius: 6px; font-size: .74rem; white-space: nowrap;
-    opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    padding: .38rem .65rem; border-radius: 7px; font-size: .74rem; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 10; box-shadow: var(--shadow);
   }}
   .bar::before {{
     content: ""; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
     border: 5px solid transparent; border-top-color: var(--tooltip-bg);
-    margin-bottom: -1px; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10;
+    margin-bottom: -1px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 10;
   }}
-  .bar:hover::after, .bar:hover::before {{ opacity: 1; }}
-  .bars-caption {{ display: flex; justify-content: space-between; color: var(--muted); font-size: .72rem; margin-top: 1rem; }}
-  footer {{ color: var(--muted); font-size: .78rem; text-align: center; margin-top: 1.6rem; }}
+  /* :hover covers desktop; .active is toggled by the click/tap handler below
+     for touch devices, which have no :hover state at all. Same pattern
+     Anthropic's own status page uses -- tap a day cell on mobile to pin
+     its tooltip open instead of it being unreachable there. */
+  .bar:hover::after, .bar:hover::before,
+  .bar.active::after, .bar.active::before {{ opacity: 1; }}
+  .bar:last-child::after {{ left: auto; right: 0; transform: none; }}
+  .bar:last-child::before {{ left: auto; right: 10px; transform: none; }}
+  .bar:first-child::after {{ left: 0; transform: none; }}
+  .bar:first-child::before {{ left: 10px; transform: none; }}
+
+  .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
+  .legend {{ display: flex; align-items: center; gap: 1rem; }}
+  .legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
+  .legend i {{ width: 8px; height: 8px; border-radius: 2px; display: inline-block; }}
+  .legend .lg-up {{ background: var(--ok); }}
+  .legend .lg-warn {{ background: var(--warn); }}
+  .legend .lg-down {{ background: var(--crit); }}
+
+  footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 2rem; }}
+  footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
+  footer a:hover {{ color: var(--text); border-color: var(--muted); }}
 </style>
 </head>
 <body>
-  <div class="banner {banner_class}">{banner_icon} {banner_text}</div>
+  <div class="banner {banner_class}"><span class="banner-icon">{banner_icon}</span>{banner_text}</div>
   <div class="wrap">
-    <div class="titlebar"><h1>📡 meshnode.id MQTT Status</h1></div>
-    <div class="sub">Status broker MQTT publik meshnode.id — data diperbarui tiap 10 menit</div>
+    <div class="titlebar"><span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1></div>
+    <div class="sub"><b>{up_count}/{total}</b> broker aktif — data diperbarui tiap 10 menit</div>
     <div class="panel">{"".join(rows)}</div>
-    <div class="bars-caption"><span>{HISTORY_DAYS} hari lalu</span><span>Hari ini</span></div>
-    <footer>Commit {commit_sha} · Diperbarui {updated_str}</footer>
+    <div class="bars-caption">
+      <span>{HISTORY_DAYS} hari lalu</span>
+      <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
+      <span>Hari ini</span>
+    </div>
+    <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
+  <script>
+    // Tap-to-pin tooltips for touch devices, which have no :hover state --
+    // same UX as Anthropic's own status page (tap a day cell on mobile).
+    // Desktop keeps working via plain CSS :hover regardless of this script.
+    document.querySelectorAll(".bar").forEach(function (bar) {{
+      bar.addEventListener("click", function (e) {{
+        var wasActive = bar.classList.contains("active");
+        document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
+        if (!wasActive) bar.classList.add("active");
+        e.stopPropagation();
+      }});
+    }});
+    document.addEventListener("click", function () {{
+      document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
+    }});
+  </script>
 </body>
 </html>
 '''
