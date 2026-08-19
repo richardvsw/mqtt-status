@@ -213,9 +213,9 @@ for host in BROKERS:
         # depending on which source (LXC vs GitHub Actions) last committed.
         parts = []
         if b["lxc_latency_ms"] is not None:
-            parts.append(f"{b['lxc_latency_ms']}ms local")
+            parts.append(f"{b['lxc_latency_ms']}ms (RiV-meshBot server)")
         if b["actions_latency_ms"] is not None:
-            parts.append(f"{b['actions_latency_ms']}ms CI")
+            parts.append(f"{b['actions_latency_ms']}ms (GitHub Actions)")
         status_label = "Operational · " + " · ".join(parts) if parts else "Operational"
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
@@ -322,9 +322,10 @@ html = f'''<!doctype html>
     100% {{ transform: scale(2.1); opacity: 0; }}
   }}
   .host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  /* Now potentially "Operational · 5ms local · 650ms CI" instead of just
-     "Operational · 5ms" -- stack below the host name on narrow screens
-     rather than squeezing both onto one row and truncating the host. */
+  /* Now potentially "Operational · 5ms (RiV-meshBot server) · 650ms
+     (GitHub Actions)" instead of just "Operational · 5ms" -- stack below
+     the host name on narrow screens rather than squeezing both onto one
+     row and truncating the host. */
   .status {{ font-weight: 600; font-variant-numeric: tabular-nums; font-size: .84rem; flex-shrink: 0; }}
   @media (max-width: 480px) {{
     .row-top {{ flex-wrap: wrap; }}
@@ -377,7 +378,8 @@ html = f'''<!doctype html>
   .legend .lg-warn {{ background: var(--warn); }}
   .legend .lg-down {{ background: var(--crit); }}
 
-  footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 2rem; }}
+  .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
+  footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: .8rem; }}
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
 </style>
@@ -393,6 +395,7 @@ html = f'''<!doctype html>
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
       <span>Hari ini</span>
     </div>
+    <p class="note">Ping diukur dari dua sumber independen: <b>RiV-meshBot server</b> (dekat Indonesia) dan <b>GitHub Actions</b> (server pengecekan cadangan, berlokasi di luar Indonesia). Ping dari GitHub Actions yang jauh lebih tinggi itu wajar/normal — bukan tanda broker lambat, cuma jarak geografis ke server pengecekannya.</p>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <script>
