@@ -443,8 +443,8 @@ html = f'''<!doctype html>
       <span>Hari ini</span>
     </div>
     <div class="ping-legend">
-      <span><i class="lg-lxc"></i>RiV-meshBot{f" ({lxc_city})" if lxc_city else ""} · server utama</span>
-      <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""} · cadangan</span>
+      <span><i class="lg-lxc"></i>RiV-meshBot{f" ({lxc_city})" if lxc_city else ""}</span>
+      <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
     </div>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
