@@ -25,6 +25,25 @@ from datetime import datetime, timezone, timedelta
 # GitHub Actions sets this on every runner automatically -- no config
 # needed on either side to tell the two apart.
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
+
+
+def get_ci_location():
+    """Best-effort geolocation of the CURRENT run's own egress IP -- only
+    called when IS_CI. GitHub-hosted runners are ephemeral VMs spun up
+    fresh per job and are NOT guaranteed to be in the same datacenter
+    every time, so this is looked up fresh on every run rather than
+    hardcoded, and simply reflects wherever this particular run actually
+    landed. Never raises -- a lookup failure just means the location is
+    omitted from the display, not a broken page."""
+    try:
+        import urllib.request
+        with urllib.request.urlopen("https://ipinfo.io/json", timeout=5) as r:
+            data = json.load(r)
+        parts = [p for p in (data.get("city"), data.get("region"), data.get("country")) if p]
+        return ", ".join(parts) if parts else None
+    except Exception as e:
+        print(f"CI geolocation lookup failed: {e}")
+        return None
 LATENCY_STATE_KEY = "actions_latency_ms" if IS_CI else "lxc_latency_ms"
 
 WIB = timezone(timedelta(hours=7))
@@ -106,6 +125,18 @@ CONFIRM_THRESHOLD = 2
 now = time.time()
 state = load_json(STATE_PATH, {})
 history = load_json(HISTORY_PATH, {})
+
+# Where each source's ping is measured from -- LXC location is fixed
+# (this box doesn't move), CI location is looked up fresh every run
+# since GitHub's runners aren't guaranteed to be in the same datacenter
+# each time. Kept under a "_meta" key, distinct from the per-host entries
+# state.json otherwise holds.
+meta = state.setdefault("_meta", {})
+meta["lxc_location"] = "Cikarang, ID"
+if IS_CI:
+    loc = get_ci_location()
+    if loc:
+        meta["actions_location"] = loc
 
 brokers = {}
 for host in BROKERS:
@@ -200,6 +231,13 @@ def day_bar_html(host):
     return "".join(bars)
 
 
+# Just the city, not the full "RiV-meshBot server"/"GitHub Actions"
+# phrase on every single row -- keeps rows to one line instead of
+# wrapping, full explanation lives once in the footnote instead of
+# repeated 5x on the page.
+lxc_city = (meta.get("lxc_location") or "").split(",")[0]
+actions_city = (meta.get("actions_location") or "").split(",")[0]
+
 rows = []
 up_count = 0
 down_hosts = []
@@ -208,14 +246,14 @@ for host in BROKERS:
     if b["reachable"]:
         up_count += 1
         status_class = "up"
-        # Both shown side by side, each labeled with where it was measured
-        # from, rather than one number that jumps between ~5ms and ~650ms
-        # depending on which source (LXC vs GitHub Actions) last committed.
+        # Color-coded instead of repeating "(city name)" text on every
+        # row -- legend explaining what each color means lives once,
+        # below the panel (see .ping-legend).
         parts = []
         if b["lxc_latency_ms"] is not None:
-            parts.append(f"{b['lxc_latency_ms']}ms (RiV-meshBot server)")
+            parts.append(f'<span class="ping ping-lxc">{b["lxc_latency_ms"]}ms</span>')
         if b["actions_latency_ms"] is not None:
-            parts.append(f"{b['actions_latency_ms']}ms (GitHub Actions)")
+            parts.append(f'<span class="ping ping-ci">{b["actions_latency_ms"]}ms</span>')
         status_label = "Operational · " + " · ".join(parts) if parts else "Operational"
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
@@ -333,6 +371,15 @@ html = f'''<!doctype html>
   }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
+  /* Ping values color-coded by source instead of repeating "(city name)"
+     text on every row -- see .ping-legend for what each color means. */
+  .ping-lxc {{ color: var(--ok); }}
+  .ping-ci {{ color: var(--accent); }}
+  .ping-legend {{ display: flex; justify-content: center; gap: 1.2rem; margin-top: .7rem; font-size: .74rem; color: var(--faint); }}
+  .ping-legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
+  .ping-legend i {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
+  .ping-legend .lg-lxc {{ background: var(--ok); }}
+  .ping-legend .lg-ci {{ background: var(--accent); }}
 
   /* No overflow:hidden here -- that would also clip the tooltip
      pseudo-elements below, which sit above each .bar's own box and are
@@ -395,7 +442,11 @@ html = f'''<!doctype html>
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
       <span>Hari ini</span>
     </div>
-    <p class="note">Ping diukur dari dua sumber independen: <b>RiV-meshBot server</b> (dekat Indonesia) dan <b>GitHub Actions</b> (server pengecekan cadangan, berlokasi di luar Indonesia). Ping dari GitHub Actions yang jauh lebih tinggi itu wajar/normal — bukan tanda broker lambat, cuma jarak geografis ke server pengecekannya.</p>
+    <div class="ping-legend">
+      <span><i class="lg-lxc"></i>RiV-meshBot{f" ({lxc_city})" if lxc_city else ""} · server utama</span>
+      <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""} · cadangan</span>
+    </div>
+    <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <script>
