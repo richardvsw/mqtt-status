@@ -7,4 +7,12 @@ ConditionPathExists=/opt/rivbot-ui/mqtt-status-repo
 
 [Service]
 Type=oneshot
+# systemd services don't inherit an interactive shell's environment --
+# without HOME set, git's credential.helper=store can't find
+# /root/.git-credentials and every push fails with "could not read
+# Username for 'https://github.com'". Confirmed 2026-08-19: the timer
+# was failing on every single run since being enabled until this was
+# added (worked fine when run manually from an interactive shell, which
+# is why that first test looked fine).
+Environment=HOME=/root
 ExecStart=/usr/bin/flock -n /run/mqtt-status-lxc.lock /opt/rivbot-ui/mqtt-status-repo/deploy/systemd/run_and_push.sh

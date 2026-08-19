@@ -1,17 +1,31 @@
 """
-Fully standalone MQTT broker status checker + page generator -- runs
-entirely inside GitHub Actions (see .github/workflows/check-status.yml),
-with NO dependency on the LXC/bot at all. Does its own plain TCP connect
-to each broker (same check mqtt_tap.py does on the LXC), keeps its own
-uptime history as a JSON file committed alongside the page, and
-regenerates index.html. If the LXC goes down, this keeps running and
-reporting real, live broker status -- the whole point of moving it here.
+Standalone MQTT broker status checker + page generator. Runs from TWO
+independent places, same script either way:
+
+- GitHub Actions (.github/workflows/check-status.yml), on a ~10 min
+  schedule, no dependency on the LXC/bot at all -- if the LXC goes down,
+  this keeps running and reporting real, live broker status.
+- This box's own LXC (deploy/systemd/, via mqtt-status-lxc.timer), every
+  2 min -- geographically near Indonesia (~5-30ms to these brokers, vs
+  the Actions runner's ~600-750ms from its US/EU datacenter, confirmed
+  2026-08-19), so this is the accurate/primary source whenever it's up.
+
+Neither side needs to know about the other or detect "is the other one
+alive" -- both independently check-and-commit-if-changed, so whichever
+committed most recently is just what the page reflects, and latency from
+each source is tracked and displayed separately (see lxc_latency_ms /
+actions_latency_ms below) rather than one clobbering the other's number.
 """
 import json
 import os
 import socket
 import time
 from datetime import datetime, timezone, timedelta
+
+# GitHub Actions sets this on every runner automatically -- no config
+# needed on either side to tell the two apart.
+IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
+LATENCY_STATE_KEY = "actions_latency_ms" if IS_CI else "lxc_latency_ms"
 
 WIB = timezone(timedelta(hours=7))
 MQTT_PORT = 1883
@@ -123,6 +137,13 @@ for host in BROKERS:
             # state.json from the 2026-08-18 false-positive incident.
             st["current_outage_start"] = None
 
+    # Persist latency under THIS source's own key only -- the other
+    # source's last-known value is left untouched, so the page can show
+    # both side by side (e.g. "5ms local / 650ms CI") instead of one
+    # number that flips wildly depending on which side last committed.
+    if raw_reachable:
+        st[LATENCY_STATE_KEY] = latency_ms
+
     # Only shown as Down once confirmed -- a single run's raw failure
     # (consecutive_fails == 1) still shows Operational publicly, exactly
     # so an unconfirmed blip never produces a false "down" reading.
@@ -131,6 +152,8 @@ for host in BROKERS:
         "reachable": not confirmed_down,
         "raw_reachable": raw_reachable,
         "latency_ms": latency_ms,
+        "lxc_latency_ms": st.get("lxc_latency_ms"),
+        "actions_latency_ms": st.get("actions_latency_ms"),
         "current_outage_start": st["current_outage_start"],
     }
 
@@ -185,7 +208,15 @@ for host in BROKERS:
     if b["reachable"]:
         up_count += 1
         status_class = "up"
-        status_label = f"Operational · {b['latency_ms']}ms" if b["latency_ms"] is not None else "Operational"
+        # Both shown side by side, each labeled with where it was measured
+        # from, rather than one number that jumps between ~5ms and ~650ms
+        # depending on which source (LXC vs GitHub Actions) last committed.
+        parts = []
+        if b["lxc_latency_ms"] is not None:
+            parts.append(f"{b['lxc_latency_ms']}ms local")
+        if b["actions_latency_ms"] is not None:
+            parts.append(f"{b['actions_latency_ms']}ms CI")
+        status_label = "Operational · " + " · ".join(parts) if parts else "Operational"
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
         status_label, status_class = f"Down · {dur}", "down"
@@ -291,7 +322,14 @@ html = f'''<!doctype html>
     100% {{ transform: scale(2.1); opacity: 0; }}
   }}
   .host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  /* Now potentially "Operational · 5ms local · 650ms CI" instead of just
+     "Operational · 5ms" -- stack below the host name on narrow screens
+     rather than squeezing both onto one row and truncating the host. */
   .status {{ font-weight: 600; font-variant-numeric: tabular-nums; font-size: .84rem; flex-shrink: 0; }}
+  @media (max-width: 480px) {{
+    .row-top {{ flex-wrap: wrap; }}
+    .status {{ flex-basis: 100%; font-size: .78rem; }}
+  }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
 
