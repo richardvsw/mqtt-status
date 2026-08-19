@@ -27,13 +27,28 @@ OUT_PATH = "index.html"
 HISTORY_DAYS = 90
 
 
-def check_broker(host, timeout=5):
+CHECK_RETRIES = 10
+RETRY_DELAY_SECONDS = 1.5
+
+
+def check_broker(host, timeout=5, retries=CHECK_RETRIES):
+    """A single bad moment on the GitHub Actions runner's own network/DNS
+    used to be enough to mark a broker down -- confirmed 2026-08-18: all 5
+    brokers failed in the same instant right after latencies had climbed
+    unusually high, while this box's own live connection to the same
+    brokers was working the entire time. Retries here so a transient
+    runner-side blip doesn't get reported as a real outage on the public
+    page; a genuinely down broker still fails every attempt and gets
+    marked down same as before, just slower to confirm."""
     t0 = time.time()
-    try:
-        with socket.create_connection((host, MQTT_PORT), timeout=timeout):
-            return True, round((time.time() - t0) * 1000)
-    except Exception:
-        return False, None
+    for attempt in range(retries):
+        try:
+            with socket.create_connection((host, MQTT_PORT), timeout=timeout):
+                return True, round((time.time() - t0) * 1000)
+        except Exception:
+            if attempt < retries - 1:
+                time.sleep(RETRY_DELAY_SECONDS)
+    return False, None
 
 
 def load_json(path, default):
@@ -63,19 +78,61 @@ def fmt_duration(seconds):
     return f"{days}h {hours % 24}j"
 
 
+# Same principle real status pages (this one deliberately mirrors
+# Anthropic's) use: don't let a single check run's result flip the public
+# status. CHECK_RETRIES already rides out sub-minute blips within one
+# run; this rides out anything that outlasts even that, by requiring the
+# SAME broker to fail CONFIRM_THRESHOLD separate scheduled runs (~10-20
+# min apart, not just retries seconds apart) before it's shown as Down.
+# Confirmed 2026-08-18: without this, a brief GitHub Actions runner-side
+# network/DNS blip reported all 5 brokers down simultaneously while this
+# box's own live connection to the same brokers never dropped.
+CONFIRM_THRESHOLD = 2
+
 now = time.time()
 state = load_json(STATE_PATH, {})
 history = load_json(HISTORY_PATH, {})
 
 brokers = {}
 for host in BROKERS:
-    reachable, latency_ms = check_broker(host)
-    st = state.setdefault(host, {"current_outage_start": None})
-    if not reachable and st["current_outage_start"] is None:
-        st["current_outage_start"] = now
-    elif reachable and st["current_outage_start"] is not None:
+    raw_reachable, latency_ms = check_broker(host)
+    st = state.setdefault(host, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
+    st.setdefault("consecutive_fails", 0)
+    st.setdefault("provisional_start", None)
+
+    if raw_reachable:
+        st["consecutive_fails"] = 0
+        st["provisional_start"] = None
         st["current_outage_start"] = None
-    brokers[host] = {"reachable": reachable, "latency_ms": latency_ms, "current_outage_start": st["current_outage_start"]}
+    else:
+        st["consecutive_fails"] += 1
+        if st["provisional_start"] is None:
+            st["provisional_start"] = now
+        if st["consecutive_fails"] >= CONFIRM_THRESHOLD:
+            # Promote to a confirmed, publicly-displayed outage -- keep the
+            # TRUE first-failure time, not the moment it got confirmed, so
+            # the displayed duration reflects the real total downtime.
+            st["current_outage_start"] = st["provisional_start"]
+        else:
+            # Not yet confirmed -- current_outage_start MUST stay null here,
+            # not just "untouched", or a stale value from before this
+            # confirm-threshold logic existed (or from a prior confirmed
+            # outage that only just recovered) would keep showing as a
+            # false "Down" until a raw success happens to land. This is
+            # also what self-heals the real repo's already-corrupted
+            # state.json from the 2026-08-18 false-positive incident.
+            st["current_outage_start"] = None
+
+    # Only shown as Down once confirmed -- a single run's raw failure
+    # (consecutive_fails == 1) still shows Operational publicly, exactly
+    # so an unconfirmed blip never produces a false "down" reading.
+    confirmed_down = st["current_outage_start"] is not None
+    brokers[host] = {
+        "reachable": not confirmed_down,
+        "raw_reachable": raw_reachable,
+        "latency_ms": latency_ms,
+        "current_outage_start": st["current_outage_start"],
+    }
 
 save_json(STATE_PATH, state)
 
@@ -84,7 +141,12 @@ today_bucket = history.setdefault(today_str, {})
 for host, b in brokers.items():
     slot = today_bucket.setdefault(host, {"up": 0, "total": 0})
     slot["total"] += 1
-    if b["reachable"]:
+    # Raw result, not the confirmed/public one -- the 90-day bar strip
+    # already has a "warn" (partial) tier for exactly this kind of noise,
+    # so a lone transient blip shows as a slightly-off day rather than
+    # either full green (hiding it) or full red (the false alarm this
+    # whole change exists to avoid on the CURRENT-status banner/rows).
+    if b["raw_reachable"]:
         slot["up"] += 1
 cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
 for d in [d for d in history if d < cutoff_date]:
