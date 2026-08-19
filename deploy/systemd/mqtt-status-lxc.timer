@@ -1,0 +1,10 @@
+[Unit]
+Description=Run mqtt-status LXC check every 2 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=2min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

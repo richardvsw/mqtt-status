@@ -1,0 +1,10 @@
+[Unit]
+Description=mqtt-status LXC-side check + push (primary; GitHub Actions is the fallback)
+# Overlapping runs shouldn't happen at a 2-min interval given how fast
+# checks are from this box, but flock guards it anyway in case a run
+# ever stalls (e.g. all brokers genuinely down, retries taking longer).
+ConditionPathExists=/opt/rivbot-ui/mqtt-status-repo
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/mqtt-status-lxc.lock /opt/rivbot-ui/mqtt-status-repo/deploy/systemd/run_and_push.sh
