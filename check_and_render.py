@@ -1032,6 +1032,15 @@ html = f'''<!doctype html>
         var r = bar.getBoundingClientRect();
         pop.classList.remove("arrow-up", "arrow-down");
         var popWidth = pop.offsetWidth || 300;
+        // Prefer the VISUAL viewport over window.innerWidth/Height where
+        // available -- on mobile Chrome the layout viewport (what
+        // window.innerHeight reports) can be taller than what's actually
+        // visible right now (address bar covering part of it), and using
+        // the layout size here is what let the card's true bottom edge
+        // land under the toolbar instead of the real visible fold.
+        var vvw = window.visualViewport;
+        var viewW = vvw ? vvw.width : window.innerWidth;
+        var viewH = vvw ? vvw.height : window.innerHeight;
         // 2026-08-22: clamped against the real viewport edges (with an
         // 8px margin) instead of just the .wrap container's own bounds
         // -- .wrap's right edge IS effectively the viewport edge on
@@ -1043,7 +1052,7 @@ html = f'''<!doctype html>
         var margin = 8;
         var left = Math.min(
           Math.max(r.left + r.width / 2 - popWidth / 2, margin),
-          window.innerWidth - popWidth - margin
+          viewW - popWidth - margin
         );
         // The card's own left edge can end up anywhere within that
         // clamp range, independent of the bar's true center -- so the
@@ -1069,7 +1078,7 @@ html = f'''<!doctype html>
           // line at the top, and overflow-y:auto (see .daypop CSS)
           // scrolls internally for anything that still doesn't fit.
           pop.style.top = vMargin + "px";
-          pop.style.bottom = (window.innerHeight - r.top + 12) + "px";
+          pop.style.bottom = (viewH - r.top + 12) + "px";
           pop.classList.add("arrow-down");
         }} else {{
           pop.style.top = (r.bottom + 12) + "px";
@@ -1155,14 +1164,27 @@ html = f'''<!doctype html>
     // Re-position (never re-open) if the active popover's own layout
     // might have shifted out from under it -- see positionPopover's own
     // comment for why fonts/resize specifically.
-    if (document.fonts && document.fonts.ready) {{
-      document.fonts.ready.then(function () {{
-        if (activeBar && pop.classList.contains("open")) positionPopover(activeBar);
-      }});
-    }}
-    window.addEventListener("resize", function () {{
+    function repositionIfOpen() {{
       if (activeBar && pop.classList.contains("open")) positionPopover(activeBar);
-    }}, {{ passive: true }});
+    }}
+    if (document.fonts && document.fonts.ready) {{
+      document.fonts.ready.then(repositionIfOpen);
+    }}
+    window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
+    // 2026-08-22: window's own "resize" event does NOT reliably fire for
+    // Android Chrome's address-bar collapse/expand -- that's specifically
+    // what visualViewport's own separate resize event exists for (the
+    // layout viewport window.innerHeight uses and the visual viewport the
+    // user actually sees can diverge exactly while the toolbar animates).
+    // Confirmed as the live gap: a taller/scrollable popover (more likely
+    // to be open across a toolbar transition, simply by being open a bit
+    // longer while the user reads more rows) kept mispositioning even
+    // after the window-resize + fonts.ready listeners above landed, while
+    // short non-scrolling popovers were already fine. window.resize is
+    // kept too since visualViewport isn't universal (older WebKit).
+    if (window.visualViewport) {{
+      window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }});
+    }}
 
     var themeToggle = document.getElementById("theme-toggle");
     themeToggle.addEventListener("click", function () {{
