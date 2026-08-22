@@ -22,6 +22,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
+# 2026-08-23: discard any leftover uncommitted state before pulling --
+# confirmed live, repeatedly: a dirty tree (always regenerated-output
+# files here, e.g. from manual dev/debug work over SSH -- real source
+# edits go through their own separate commit, never accumulate as
+# stray uncommitted diffs in this checkout) makes `git pull --rebase`
+# fail at the very first line, which cascades into the lxc-monitor
+# staleness detector correctly-but-misleadingly reporting this box as
+# down. Every one of these files gets regenerated fresh moments later
+# regardless of what was on disk before this line runs, so discarding
+# whatever is here is always safe -- this is what actually makes the
+# script self-healing against that whole failure class, instead of
+# relying on remembering to `git status` clean before every SSH
+# session ends.
+if [ -n "$(git status --porcelain)" ]; then
+    echo "mqtt-status-lxc: discarding dirty working tree before pull"
+    git checkout --quiet -- .
+    git clean --quiet -fd
+fi
+
 git pull --rebase --quiet origin main
 
 # 2026-08-22: check_and_render.py now does a real authenticated MQTT
