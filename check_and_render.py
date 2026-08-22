@@ -772,6 +772,10 @@ html = f'''<!doctype html>
   :root[data-theme="light"] .theme-toggle .icon-sun {{ display: none; }}
   :root[data-theme="light"] .theme-toggle .icon-moon {{ display: block; }}
   .titlebar .glyph {{ font-size: 1.25rem; line-height: 1; }}
+  .live-clock {{
+    font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; flex-shrink: 0; margin-right: .3rem;
+  }}
   .titlebar h1 {{ font-size: 1.2rem; font-weight: 650; margin: 0; letter-spacing: -.2px; }}
   .sub {{ color: var(--muted); font-size: .86rem; margin-bottom: 1.8rem; }}
   .sub b {{ color: var(--text); font-weight: 600; }}
@@ -974,6 +978,7 @@ html = f'''<!doctype html>
   <div class="wrap">
     <div class="titlebar">
       <span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1>
+      <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
       <button class="theme-toggle" id="theme-toggle" aria-label="Ganti tema terang/gelap" title="Ganti tema terang/gelap">
         <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
         <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -1232,6 +1237,24 @@ html = f'''<!doctype html>
       if (pop.classList.contains("open") && !pop.contains(e.target)) closePop();
     }});
     window.addEventListener("scroll", closePop, {{ passive: true }});
+
+    // 2026-08-22: live-ticking clock -- WIB is a fixed UTC+7 offset
+    // (no DST, no historical changes to account for), so computing it
+    // by hand from the visitor's own UTC clock is simpler and more
+    // portable than fighting Intl.DateTimeFormat timezone-name
+    // support across older mobile browsers. Ticks independently of
+    // the page's own 60s data refresh -- this is just wall-clock
+    // time, not tied to when the data was last checked.
+    var liveClock = document.getElementById("live-clock");
+    function tickClock() {{
+      var wib = new Date(Date.now() + 7 * 3600 * 1000);
+      var hh = String(wib.getUTCHours()).padStart(2, "0");
+      var mm = String(wib.getUTCMinutes()).padStart(2, "0");
+      var ss = String(wib.getUTCSeconds()).padStart(2, "0");
+      liveClock.textContent = hh + ":" + mm + ":" + ss + " WIB";
+    }}
+    tickClock();
+    setInterval(tickClock, 1000);
   </script>
 </body>
 </html>
@@ -1255,18 +1278,55 @@ import html as _html_mod
 _today_str_cal = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
 
 
+# 2026-08-22: status.claude.com's own calendar uses a continuous
+# green->yellow->orange->red gradient keyed to that day's real uptime %,
+# not a fixed 3-bucket scheme -- confirmed live against the reference
+# (a 4-hour outage day and a 5-minute blip both used to render as the
+# exact same flat red here, losing the severity signal a color gradient
+# is supposed to carry). Piecewise-linear interpolation between a few
+# named stops, closely matching the reference's own observed hues
+# (100% green #76ad2a through 0% red #e04343).
+_SEVERITY_STOPS = [
+    (100.0, (0x76, 0xad, 0x2a)),
+    (99.5,  (0x9a, 0xb4, 0x2a)),
+    (97.0,  (0xd9, 0xa9, 0x2a)),
+    (90.0,  (0xe6, 0xa8, 0x2a)),
+    (75.0,  (0xe8, 0x61, 0x36)),
+    (0.0,   (0xe0, 0x43, 0x43)),
+]
+
+
+def _severity_color(pct):
+    pct = max(0.0, min(100.0, pct))
+    for (p1, c1), (p2, c2) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:]):
+        if pct >= p1:
+            return f"#{c1[0]:02x}{c1[1]:02x}{c1[2]:02x}"
+        if pct >= p2:
+            t = (p1 - pct) / (p1 - p2)
+            r = round(c1[0] + (c2[0] - c1[0]) * t)
+            g = round(c1[1] + (c2[1] - c1[1]) * t)
+            b = round(c1[2] + (c2[2] - c1[2]) * t)
+            return f"#{r:02x}{g:02x}{b:02x}"
+    last = _SEVERITY_STOPS[-1][1]
+    return f"#{last[0]:02x}{last[1]:02x}{last[2]:02x}"
+
+
 def _cal_day_cell(host, d):
     slot = history.get(d, {}).get(host)
     if not slot or slot.get("total", 0) == 0:
         return f'<div class="cal-day nodata" data-date="{d}" data-status="nodata"></div>'
     total = slot["total"]
     pct = slot["up"] / total * 100
+    # cls kept for data-status (drives the popover's no-incident-data
+    # fallback icon/label -- see the click handler's noDataStyle map) --
+    # the VISIBLE color comes from the gradient below, not this bucket.
     cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+    color = _severity_color(pct)
     incidents = _clip_incidents_to_day(host, d)
     incidents_attr = _html_mod.escape(json.dumps(incidents), quote=True)
     is_today = "1" if d == _today_str_cal else "0"
     return (
-        f'<div class="cal-day {cls}" data-date="{d}" data-status="{cls}" '
+        f'<div class="cal-day" style="background:{color}" data-date="{d}" data-status="{cls}" '
         f'data-pct="{pct:.0f}" data-today="{is_today}" data-incidents="{incidents_attr}"></div>'
     )
 
