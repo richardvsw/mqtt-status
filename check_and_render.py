@@ -747,7 +747,7 @@ html = f'''<!doctype html>
           // changes depending on whether the day is still in progress.
           var pctLabel = bar.dataset.today === "1"
             ? 'Aktif ' + bar.dataset.pct + '% dari waktu berjalan hari ini'
-            : 'Aktif ' + bar.dataset.pct + '% pada hari itu';
+            : 'Aktif ' + bar.dataset.pct + '%';
           body += '<div class="daypop-pct">' + pctLabel + '</div>';
         }}
         popBody.innerHTML = body;
