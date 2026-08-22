@@ -1244,35 +1244,31 @@ print(f"wrote {OUT_PATH} ({up_count}/{total} brokers up)")
 
 # ── Historical uptime calendar page (uptime.html) ──────────────────────────
 # Mirrors status.claude.com's own /uptime page (confirmed live against the
-# real site, 2026-08-22): a weekday-aligned calendar grid, one small
-# colored square per day, grouped by month, with a per-month uptime %
-# header -- distinct from the main page's 30-day horizontal bar strip,
-# which is a different (denser, click-for-detail) view of the same
-# underlying data and stays as-is.
+# real site, 2026-08-22): ONE broker's calendar visible at a time (picked
+# via dropdown, not all six stacked), a 3-month sliding window with
+# prev/next arrows, and clicking a day opens the SAME incident popover the
+# main page already uses (reuses _clip_incidents_to_day -- real clock
+# start/end per incident, not just a color) rather than a plain tooltip.
 import calendar as _calendar_mod
+import html as _html_mod
+
+_today_str_cal = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
 
 
-def _month_status(host, year, month):
-    """List of (day_num_or_None, css_class) for one calendar month --
-    None for the leading placeholder cells before day 1 (weekday
-    alignment, Monday-first). css_class matches the existing
-    up/warn/down/nodata coloring the main page's day bars already use,
-    so this page reads as the same visual language, not a new one."""
-    first_weekday, days_in_month = _calendar_mod.monthrange(year, month)
-    cells = [(None, "empty")] * first_weekday
-    today_str = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
-    for day in range(1, days_in_month + 1):
-        d = f"{year:04d}-{month:02d}-{day:02d}"
-        if d > today_str:
-            break  # don't render future days at all, not even as nodata
-        slot = history.get(d, {}).get(host)
-        if not slot or slot.get("total", 0) == 0:
-            cells.append((day, "nodata"))
-            continue
-        pct = slot["up"] / slot["total"] * 100
-        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
-        cells.append((day, cls))
-    return cells
+def _cal_day_cell(host, d):
+    slot = history.get(d, {}).get(host)
+    if not slot or slot.get("total", 0) == 0:
+        return f'<div class="cal-day nodata" data-date="{d}" data-status="nodata"></div>'
+    total = slot["total"]
+    pct = slot["up"] / total * 100
+    cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+    incidents = _clip_incidents_to_day(host, d)
+    incidents_attr = _html_mod.escape(json.dumps(incidents), quote=True)
+    is_today = "1" if d == _today_str_cal else "0"
+    return (
+        f'<div class="cal-day {cls}" data-date="{d}" data-status="{cls}" '
+        f'data-pct="{pct:.0f}" data-today="{is_today}" data-incidents="{incidents_attr}"></div>'
+    )
 
 
 def _month_uptime_pct(host, year, month):
@@ -1289,9 +1285,7 @@ def _month_uptime_pct(host, year, month):
 def _months_with_data(host, max_months=13):
     """(year, month) tuples ascending, from the earliest month this host
     has ANY recorded data through the current month -- capped at
-    max_months so the page stays bounded even once retention has been
-    running a long time (status.claude.com itself only ever shows 3;
-    13 gives real headroom without becoming unbounded)."""
+    max_months so a broker never accumulates an unbounded month list."""
     host_days = sorted(d for d, hosts in history.items() if host in hosts)
     if not host_days:
         return []
@@ -1309,40 +1303,37 @@ def _months_with_data(host, max_months=13):
 
 
 def _month_block_html(host, year, month):
-    cells = _month_status(host, year, month)
+    first_weekday, days_in_month = _calendar_mod.monthrange(year, month)
+    cell_parts = ['<div class="cal-day empty"></div>'] * first_weekday
+    for day in range(1, days_in_month + 1):
+        d = f"{year:04d}-{month:02d}-{day:02d}"
+        if d > _today_str_cal:
+            break  # don't render future days at all, not even as nodata
+        cell_parts.append(_cal_day_cell(host, d))
+    cells_html = "".join(cell_parts)
     pct = _month_uptime_pct(host, year, month)
     pct_label = f"{pct:.2f}%" if pct is not None else "-"
     month_name = _calendar_mod.month_name[month]
-    cell_parts = []
-    for day, cls in cells:
-        if day:
-            cell_parts.append(f'<div class="cal-day {cls}" title="{year:04d}-{month:02d}-{day:02d}"></div>')
-        else:
-            cell_parts.append('<div class="cal-day empty"></div>')
-    cells_html = "".join(cell_parts)
     return (
-        '\n      <div class="cal-month">\n'
+        f'\n      <div class="cal-month" data-ym="{year:04d}-{month:02d}" data-label="{month_name} {year}">\n'
         f'        <div class="cal-month-head"><span>{month_name} {year}</span><span class="cal-month-pct">{pct_label}</span></div>\n'
         f'        <div class="cal-grid">{cells_html}</div>\n'
         '      </div>'
     )
 
 
-def _broker_uptime_section(host):
+def _broker_section_html(host, is_first):
     months = _months_with_data(host)
+    display = "" if is_first else "display:none"
     if not months:
-        return f'<div class="cal-component"><h3>{host}</h3><p class="note">Belum ada data.</p></div>'
+        return f'<div class="cal-broker" data-host="{host}" style="{display}"><p class="note">Belum ada data.</p></div>'
     blocks = "".join(_month_block_html(host, y, m) for y, m in months)
-    return (
-        f'\n    <div class="cal-component">\n'
-        f'      <h3>{host}</h3>\n'
-        f'      <div class="cal-months">{blocks}</div>\n'
-        '    </div>'
-    )
+    return f'<div class="cal-broker" data-host="{host}" style="{display}">{blocks}</div>'
 
 
 uptime_updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
-_uptime_sections = "".join(_broker_uptime_section(h) for h in BROKERS)
+_broker_sections = "".join(_broker_section_html(h, h == BROKERS[0]) for h in BROKERS)
+_broker_options = "".join(f'<option value="{h}">{h}</option>' for h in BROKERS)
 
 uptime_html = f"""<!doctype html>
 <html lang="id">
@@ -1366,14 +1357,20 @@ uptime_html = f"""<!doctype html>
   :root {{
     --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
     --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
-    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
+    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
+    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
+    --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
   }}
   html {{ color-scheme: dark; }}
   html[data-theme="light"] {{ color-scheme: light; }}
   :root[data-theme="light"] {{
     --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
     --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
-    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+    --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
+    --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
+    --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
+    --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
   }}
   * {{ box-sizing: border-box; }}
   body {{
@@ -1382,26 +1379,26 @@ uptime_html = f"""<!doctype html>
     -webkit-font-smoothing: antialiased;
   }}
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
-  h1 {{ font-size: 1.15rem; font-weight: 650; margin: 0 0 .3rem; }}
+  h1 {{ font-size: 1.15rem; font-weight: 650; margin: .8rem 0 .3rem; }}
   .back {{ color: var(--accent); text-decoration: none; font-size: .85rem; }}
   .back:hover {{ text-decoration: underline; }}
-  .cal-component {{
-    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
-    padding: 1.1rem 1.2rem; margin-top: 1.2rem;
+  select {{
+    width: 100%; margin-top: 1.2rem; padding: .65rem .8rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surf); color: var(--text);
+    font-family: inherit; font-size: .88rem; font-weight: 600;
   }}
-  .cal-component h3 {{ margin: 0 0 .8rem; font-size: .92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }}
+  .cal-nav {{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 1.4rem; margin-bottom: .6rem;
+  }}
+  .cal-nav button {{
+    width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surf); color: var(--text); cursor: pointer; font-size: .9rem;
+  }}
+  .cal-nav button:disabled {{ opacity: .35; cursor: default; }}
+  .cal-nav button:not(:disabled):hover {{ background: var(--surf2); }}
+  .cal-range {{ font-size: .85rem; color: var(--muted); font-weight: 600; }}
   .cal-months {{ display: flex; flex-wrap: wrap; gap: 1.4rem; }}
-  /* 2026-08-22: .cal-month had no explicit width, relying on .cal-grid's
-     min(220px, 100%) to imply one -- a circular reference, since that
-     100% resolves against .cal-month's OWN width, which itself was only
-     ever going to come FROM the grid. Percentages against an
-     indeterminate auto-sized flex-item parent resolve toward their
-     min-content contribution instead, per spec, so both the grid and
-     the month-head's available space collapsed much narrower than
-     intended -- confirmed live: the head's flex space-between had
-     almost no room, so the month name and % ran together with no gap.
-     Fixed by giving .cal-month its own explicit width -- .cal-grid's
-     min(220px, 100%) now resolves cleanly against a KNOWN parent size. */
   .cal-month {{ width: min(220px, 100%); }}
   .cal-month-head {{
     display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
@@ -1409,24 +1406,243 @@ uptime_html = f"""<!doctype html>
   }}
   .cal-month-pct {{ font-variant-numeric: tabular-nums; color: var(--text); }}
   .cal-grid {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; }}
-  .cal-day {{ aspect-ratio: 1; border-radius: 3px; background: var(--border); }}
-  .cal-day.empty {{ background: transparent; }}
+  .cal-day {{ aspect-ratio: 1; border-radius: 3px; background: var(--border); cursor: pointer; }}
+  .cal-day.empty {{ background: transparent; cursor: default; }}
   .cal-day.up {{ background: var(--ok); }}
   .cal-day.warn {{ background: var(--warn); }}
   .cal-day.down {{ background: var(--crit); }}
-  .cal-day.nodata {{ background: var(--border); }}
+  .cal-day.nodata {{ background: var(--border); cursor: default; }}
+  .cal-day:hover:not(.empty):not(.nodata) {{ opacity: .85; transform: scale(1.08); }}
   .note {{ color: var(--faint); font-size: .82rem; }}
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
+
+  .daypop {{
+    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
+    transform: translateY(4px); transition: opacity .12s, transform .12s;
+    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
+  }}
+  .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
+  .daypop-arrow {{
+    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
+    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+    opacity: 0; pointer-events: none; transition: opacity .12s;
+  }}
+  .daypop-arrow.open {{ opacity: 1; }}
+  .daypop-arrow.arrow-up {{ transform: rotate(45deg); }}
+  .daypop-arrow.arrow-down {{ transform: rotate(225deg); }}
+  .daypop-head {{
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surf2); z-index: 1;
+    padding: .9rem 1rem .55rem; border-bottom: 1px solid var(--border-soft);
+  }}
+  #daypop-body {{ padding: .6rem 1rem 1rem; }}
+  .daypop-date {{ font-weight: 650; font-size: .9rem; }}
+  .daypop-close {{
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem;
+    line-height: 1; padding: .15rem; border-radius: 5px;
+  }}
+  .daypop-close:hover {{ color: var(--text); background: var(--border-soft); }}
+  .daypop-row {{
+    display: flex; align-items: center; gap: .5rem; padding: .5rem .6rem; border-radius: 8px;
+    font-size: .82rem; margin-bottom: .4rem;
+  }}
+  .daypop-row:last-child {{ margin-bottom: 0; }}
+  .daypop-row.down {{ background: var(--crit-bg); color: var(--crit); }}
+  .daypop-row.autherr {{ background: var(--warn-bg); color: var(--warn); }}
+  .daypop-row.ok {{ background: var(--ok-bg); color: var(--ok); }}
+  .daypop-row-icon {{ flex-shrink: 0; }}
+  .daypop-row-main {{ flex: 1; min-width: 0; }}
+  .daypop-row-label {{ font-weight: 600; }}
+  .daypop-row-time {{ font-variant-numeric: tabular-nums; font-size: .74rem; opacity: .8; margin-top: .1rem; }}
+  .daypop-row-dur {{ font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; flex-shrink: 0; }}
+  .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 </style>
 </head>
 <body>
   <div class="wrap">
     <a class="back" href="index.html">← Kembali ke status</a>
-    <h1 style="margin-top:.8rem">Riwayat Uptime</h1>
-    <p class="note">Kotak berwarna = satu hari. Arahkan kursor buat lihat tanggalnya.</p>
-    {_uptime_sections}
+    <h1>Riwayat Uptime</h1>
+    <select id="broker-select">{_broker_options}</select>
+    <div class="cal-nav">
+      <button id="cal-prev" aria-label="Bulan sebelumnya">‹</button>
+      <span class="cal-range" id="cal-range"></span>
+      <button id="cal-next" aria-label="Bulan berikutnya">›</button>
+    </div>
+    <div id="cal-container">{_broker_sections}</div>
     <footer>Diperbarui {uptime_updated_str}</footer>
   </div>
+  <div class="daypop" id="daypop">
+    <div class="daypop-head">
+      <span class="daypop-date" id="daypop-date"></span>
+      <button class="daypop-close" id="daypop-close" aria-label="Tutup">✕</button>
+    </div>
+    <div id="daypop-body"></div>
+  </div>
+  <div class="daypop-arrow" id="daypop-arrow"></div>
+  <script>
+    // ── day popover -- identical interaction/positioning to the main
+    // status page's (see check_and_render.py's own comments there for
+    // the font-reflow/visualViewport reasoning); only the trigger
+    // selector (.cal-day instead of .bar) differs.
+    var pop = document.getElementById("daypop");
+    var popDate = document.getElementById("daypop-date");
+    var popBody = document.getElementById("daypop-body");
+    var popClose = document.getElementById("daypop-close");
+    var popArrow = document.getElementById("daypop-arrow");
+    var activeCell = null;
+
+    function closePop() {{
+      pop.classList.remove("open");
+      popArrow.classList.remove("open");
+      if (activeCell) activeCell.classList.remove("active");
+      activeCell = null;
+    }}
+
+    function rowHtml(kind, label, seconds, startClock, endClock) {{
+      var icon = kind === "down" ? "✕" : (kind === "autherr" ? "⚠" : "✓");
+      var mins = Math.round(seconds / 60);
+      var dur;
+      if (mins < 60) {{ dur = mins + " menit"; }}
+      else {{ var h = Math.floor(mins / 60), m = mins % 60; dur = m === 0 ? (h + " jam") : (h + " jam " + m + " menit"); }}
+      var timeRange = (startClock && endClock)
+        ? '<div class="daypop-row-time">' + startClock + '–' + endClock + ' WIB</div>' : '';
+      return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
+             '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
+             '</div><span class="daypop-row-dur">' + dur + '</span></div>';
+    }}
+
+    function positionPopover(cell) {{
+      var r = cell.getBoundingClientRect();
+      pop.classList.remove("arrow-up", "arrow-down");
+      var popWidth = pop.offsetWidth || 300;
+      var vvw = window.visualViewport;
+      var viewW = vvw ? vvw.width : window.innerWidth;
+      var viewH = vvw ? vvw.height : window.innerHeight;
+      var margin = 8;
+      var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, margin), viewW - popWidth - margin);
+      var arrowX = r.left + r.width / 2 - left;
+      arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
+      var spaceAbove = r.top;
+      var vMargin = 8;
+      pop.style.transform = "translateY(0)";
+      if (spaceAbove > 220) {{
+        pop.style.top = vMargin + "px";
+        pop.style.bottom = (viewH - r.top + 12) + "px";
+        pop.classList.add("arrow-down");
+      }} else {{
+        pop.style.top = (r.bottom + 12) + "px";
+        pop.style.bottom = vMargin + "px";
+        pop.classList.add("arrow-up");
+      }}
+      pop.style.left = left + "px";
+      pop.classList.add("open");
+      var popRect = pop.getBoundingClientRect();
+      popArrow.classList.remove("arrow-up", "arrow-down");
+      if (pop.classList.contains("arrow-up")) {{
+        popArrow.style.top = (popRect.top - 5) + "px";
+        popArrow.classList.add("arrow-up");
+      }} else {{
+        popArrow.style.top = (popRect.bottom - 5) + "px";
+        popArrow.classList.add("arrow-down");
+      }}
+      popArrow.style.left = (popRect.left + arrowX - 5) + "px";
+      popArrow.classList.add("open");
+    }}
+
+    function openDayCell(cell) {{
+      var wasActive = cell.classList.contains("active");
+      document.querySelectorAll(".cal-day.active").forEach(function (c) {{ c.classList.remove("active"); }});
+      if (wasActive) {{ closePop(); return; }}
+      var status = cell.dataset.status;
+      if (!status || status === "nodata") return;
+      cell.classList.add("active");
+      activeCell = cell;
+      popDate.textContent = cell.dataset.date;
+      var incidents = [];
+      try {{ incidents = JSON.parse(cell.dataset.incidents || "[]"); }} catch (err) {{ incidents = []; }}
+      var body = "";
+      if (incidents.length === 0) {{
+        var noDataStyle = {{
+          up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
+          down: {{ cls: "down",    icon: "✕", label: "Tidak ada rincian tersedia" }},
+          warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada rincian tersedia" }}
+        }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada rincian tersedia" }};
+        body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
+               '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
+      }} else {{
+        incidents.forEach(function (inc) {{ body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); }});
+      }}
+      if (cell.dataset.pct) {{
+        body += '<div class="daypop-pct">Aktif ' + cell.dataset.pct + '%</div>';
+      }}
+      popBody.innerHTML = body;
+      positionPopover(cell);
+    }}
+
+    document.getElementById("cal-container").addEventListener("click", function (e) {{
+      var cell = e.target.closest(".cal-day");
+      if (cell) {{ e.stopPropagation(); openDayCell(cell); }}
+    }});
+
+    function repositionIfOpen() {{ if (activeCell && pop.classList.contains("open")) positionPopover(activeCell); }}
+    if (document.fonts && document.fonts.ready) {{ document.fonts.ready.then(repositionIfOpen); }}
+    window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
+    if (window.visualViewport) {{ window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }}); }}
+    popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
+    document.addEventListener("click", function (e) {{ if (pop.classList.contains("open") && !pop.contains(e.target)) closePop(); }});
+    window.addEventListener("scroll", closePop, {{ passive: true }});
+
+    // ── broker dropdown + 3-month sliding window ────────────────────────
+    var brokerSelect = document.getElementById("broker-select");
+    var prevBtn = document.getElementById("cal-prev");
+    var nextBtn = document.getElementById("cal-next");
+    var rangeLabel = document.getElementById("cal-range");
+    var WINDOW_SIZE = 3;
+    var windowStart = 0;
+
+    function activeBrokerEl() {{
+      return document.querySelector('.cal-broker[data-host="' + brokerSelect.value + '"]');
+    }}
+
+    function renderWindow() {{
+      closePop();
+      var broker = activeBrokerEl();
+      if (!broker) return;
+      var months = Array.from(broker.querySelectorAll(".cal-month"));
+      if (months.length === 0) {{ rangeLabel.textContent = ""; prevBtn.disabled = nextBtn.disabled = true; return; }}
+      windowStart = Math.max(0, Math.min(windowStart, months.length - 1));
+      var visible = months.slice(windowStart, windowStart + WINDOW_SIZE);
+      months.forEach(function (m) {{ m.style.display = visible.includes(m) ? "" : "none"; }});
+      var first = visible[0], last = visible[visible.length - 1];
+      rangeLabel.textContent = visible.length > 1
+        ? (first.dataset.label + " to " + last.dataset.label)
+        : first.dataset.label;
+      prevBtn.disabled = windowStart <= 0;
+      nextBtn.disabled = windowStart + WINDOW_SIZE >= months.length;
+    }}
+
+    brokerSelect.addEventListener("change", function () {{
+      document.querySelectorAll(".cal-broker").forEach(function (b) {{ b.style.display = "none"; }});
+      var broker = activeBrokerEl();
+      if (broker) broker.style.display = "";
+      var months = broker ? broker.querySelectorAll(".cal-month").length : 0;
+      windowStart = Math.max(0, months - WINDOW_SIZE);
+      renderWindow();
+    }});
+    prevBtn.addEventListener("click", function () {{ windowStart -= WINDOW_SIZE; renderWindow(); }});
+    nextBtn.addEventListener("click", function () {{ windowStart += WINDOW_SIZE; renderWindow(); }});
+
+    (function initWindow() {{
+      var broker = activeBrokerEl();
+      var months = broker ? broker.querySelectorAll(".cal-month").length : 0;
+      windowStart = Math.max(0, months - WINDOW_SIZE);
+      renderWindow();
+    }})();
+
+    var themeToggle = null; // no theme toggle button on this page (yet) -- theme still applied via the inline localStorage check in <head>
+  </script>
 </body>
 </html>
 """
