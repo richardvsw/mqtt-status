@@ -83,7 +83,14 @@ HISTORY_PATH = "history.json"
 LOG_PATH = "log.jsonl"  # append-only per-run detail log -- kept separate so index.html only ever holds the current rendered state, not accumulating history
 STATE_PATH = "state.json"  # tracks current_outage_start per host, same purpose as mqtt_tap's own outage_state
 OUT_PATH = "index.html"
-HISTORY_DAYS = 90
+# 2026-08-22: dropped from 90 -> 30 to match the reference layout
+# (status.claude.com) -- at 90 days each bar was too thin on mobile to
+# reliably tap; 30 keeps every bar wide enough for the new click-to-open
+# popover below to feel deliberate rather than fiddly. Existing history
+# beyond 30 days simply stops being *displayed* -- the trim logic a few
+# lines down only deletes what's now unreachably old, so this is a
+# display-window change, not a data-loss one for anything within 30 days.
+HISTORY_DAYS = 30
 
 
 CHECK_RETRIES = 10
@@ -346,30 +353,62 @@ day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strftime("%
               for i in range(HISTORY_DAYS - 1, -1, -1)]
 
 
+def _fmt_clock_duration(seconds):
+    """"3 jam 25 menit" style -- distinct from fmt_duration() above (which
+    favors compact "3j 25m" for the current-outage banner/rows): the
+    popover has room to spell it out, matching the reference layout's
+    "3 hrs 25 mins" framing."""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds} detik"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} menit"
+    hours = minutes // 60
+    rem_minutes = minutes % 60
+    if rem_minutes == 0:
+        return f"{hours} jam"
+    return f"{hours} jam {rem_minutes} menit"
+
+
 def day_bar_html(host):
     bars = []
     for d in day_labels:
         slot = history.get(d, {}).get(host)
         if not slot or slot["total"] == 0:
-            cls, tip = "nodata", f"{d}: belum ada data"
-        else:
-            pct = slot["up"] / slot["total"] * 100
-            cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
-            tip = f"{d}: {pct:.0f}% aktif"
-            # down/auth_error breakdown only exists for days recorded
-            # since 2026-08-22 -- older days silently omit it below
-            # rather than showing a misleading "0 down, 0 auth error"
-            # that isn't actually known.
-            down_n = slot.get("down", 0)
-            auth_n = slot.get("auth_error", 0)
-            if down_n or auth_n:
-                parts = []
-                if down_n:
-                    parts.append(f"{down_n}x down")
-                if auth_n:
-                    parts.append(f"{auth_n}x auth ditolak")
-                tip += f" ({', '.join(parts)})"
-        bars.append(f'<div class="bar {cls}" data-tip="{tip}"></div>')
+            bars.append(f'<div class="bar nodata" data-date="{d}" data-status="nodata"></div>')
+            continue
+        total = slot["total"]
+        pct = slot["up"] / total * 100
+        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+        # down/auth_error breakdown only exists for days recorded since
+        # 2026-08-22 -- older days silently omit it (data-incidents stays
+        # empty) rather than showing a misleading "0" duration that was
+        # never actually measured; the popover falls back to just the
+        # uptime % for those.
+        down_n = slot.get("down", 0)
+        auth_n = slot.get("auth_error", 0)
+        # Each slot's own check count is the only record of how much of
+        # the day it actually covers (a partial/just-started day has
+        # fewer checks than a full one) -- duration is that check's
+        # share of total checks, scaled against the real elapsed portion
+        # of the 24h day using DAY_SECONDS / total as the per-check
+        # "weight". This is an approximation (check cadence isn't
+        # perfectly even between the LXC's 2-min timer and Actions' 10-min
+        # fallback) but it's the closest available without storing a
+        # timestamp on every single check.
+        day_seconds = 86400 if d != day_labels[-1] else max(1, (now - datetime.combine(
+            datetime.fromtimestamp(now, WIB).date(), datetime.min.time(), WIB).timestamp()))
+        incidents = []
+        if down_n:
+            incidents.append({"kind": "down", "label": "Down", "seconds": down_n / total * day_seconds})
+        if auth_n:
+            incidents.append({"kind": "autherr", "label": "Auth Ditolak", "seconds": auth_n / total * day_seconds})
+        import html as _html
+        incidents_attr = _html.escape(json.dumps(incidents), quote=True)
+        bars.append(
+            f'<div class="bar {cls}" data-date="{d}" data-status="{cls}" '
+            f'data-pct="{pct:.0f}" data-incidents="{incidents_attr}"></div>')
     return "".join(bars)
 
 
@@ -546,7 +585,7 @@ html = f'''<!doctype html>
      positioned relative to it, not to .bars. Rounding is done on the
      first/last .bar directly instead, so the strip still reads as one
      rounded pill without needing to clip anything. */
-  .bars {{ display: flex; gap: 2px; height: 30px; }}
+  .bars {{ display: flex; gap: 3px; height: 34px; }}
   .bar {{ flex: 1 1 0; min-width: 0; position: relative; cursor: pointer; }}
   .bar:first-child {{ border-top-left-radius: 4px; border-bottom-left-radius: 4px; }}
   .bar:last-child {{ border-top-right-radius: 4px; border-bottom-right-radius: 4px; }}
@@ -555,27 +594,47 @@ html = f'''<!doctype html>
   .bar.down {{ background: var(--crit); }}
   .bar.nodata {{ background: var(--border); }}
   .bar:hover, .bar.active {{ opacity: 1; transform: scaleY(1.06); }}
-  .bar::after {{
-    content: attr(data-tip); position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%);
-    background: var(--tooltip-bg); color: var(--text); border: 1px solid var(--border);
-    padding: .38rem .65rem; border-radius: 7px; font-size: .74rem; white-space: nowrap;
-    opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 10; box-shadow: var(--shadow);
+
+  /* 2026-08-22: replaced the old CSS-only ::after tooltip (a single line
+     of text) with a JS-built popover card -- mirrors status.claude.com's
+     "click a day, see a card with the incident type + duration" pattern,
+     which a one-line tooltip can't express once a day has more than one
+     kind of incident (e.g. both a real outage AND an auth rejection).
+     Positioning/open-close logic lives in the <script> block below;
+     this is just the card's visual shell. */
+  .daypop {{
+    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    background: var(--surf2); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: .9rem 1rem 1rem; opacity: 0; pointer-events: none;
+    transform: translateY(4px); transition: opacity .12s, transform .12s;
   }}
-  .bar::before {{
-    content: ""; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-    border: 5px solid transparent; border-top-color: var(--tooltip-bg);
-    margin-bottom: -1px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 10;
+  .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
+  .daypop::before {{
+    content: ""; position: absolute; width: 10px; height: 10px; background: var(--surf2);
+    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+    transform: rotate(45deg);
   }}
-  /* :hover covers desktop; .active is toggled by the click/tap handler below
-     for touch devices, which have no :hover state at all. Same pattern
-     Anthropic's own status page uses -- tap a day cell on mobile to pin
-     its tooltip open instead of it being unreachable there. */
-  .bar:hover::after, .bar:hover::before,
-  .bar.active::after, .bar.active::before {{ opacity: 1; }}
-  .bar:last-child::after {{ left: auto; right: 0; transform: none; }}
-  .bar:last-child::before {{ left: auto; right: 10px; transform: none; }}
-  .bar:first-child::after {{ left: 0; transform: none; }}
-  .bar:first-child::before {{ left: 10px; transform: none; }}
+  .daypop.arrow-up::before {{ top: -6px; }}
+  .daypop.arrow-down::before {{ bottom: -6px; transform: rotate(225deg); }}
+  .daypop-head {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: .55rem; }}
+  .daypop-date {{ font-weight: 650; font-size: .9rem; }}
+  .daypop-close {{
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem;
+    line-height: 1; padding: .15rem; border-radius: 5px;
+  }}
+  .daypop-close:hover {{ color: var(--text); background: var(--border-soft); }}
+  .daypop-row {{
+    display: flex; align-items: center; gap: .5rem; padding: .5rem .6rem; border-radius: 8px;
+    font-size: .82rem; margin-bottom: .4rem;
+  }}
+  .daypop-row:last-child {{ margin-bottom: 0; }}
+  .daypop-row.down {{ background: var(--crit-bg); color: var(--crit); }}
+  .daypop-row.autherr {{ background: var(--warn-bg); color: var(--warn); }}
+  .daypop-row.ok {{ background: var(--ok-bg); color: var(--ok); }}
+  .daypop-row-icon {{ flex-shrink: 0; }}
+  .daypop-row-label {{ flex: 1; font-weight: 600; }}
+  .daypop-row-dur {{ font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }}
+  .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 
   .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
   .legend {{ display: flex; align-items: center; gap: 1rem; }}
@@ -609,21 +668,104 @@ html = f'''<!doctype html>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
+  <div class="daypop" id="daypop">
+    <div class="daypop-head">
+      <span class="daypop-date" id="daypop-date"></span>
+      <button class="daypop-close" id="daypop-close" aria-label="Tutup">✕</button>
+    </div>
+    <div id="daypop-body"></div>
+  </div>
   <script>
-    // Tap-to-pin tooltips for touch devices, which have no :hover state --
-    // same UX as Anthropic's own status page (tap a day cell on mobile).
-    // Desktop keeps working via plain CSS :hover regardless of this script.
+    // Click-to-open day popover -- same interaction status.claude.com
+    // uses (click a day cell, get a card with incident type + duration),
+    // chosen over the old CSS ::after tooltip because a day can have more
+    // than one kind of incident (a real Down AND a separate Auth Ditolak
+    // period) that a single tooltip line can't represent cleanly.
+    var pop = document.getElementById("daypop");
+    var popDate = document.getElementById("daypop-date");
+    var popBody = document.getElementById("daypop-body");
+    var popClose = document.getElementById("daypop-close");
+    var activeBar = null;
+
+    function closePop() {{
+      pop.classList.remove("open");
+      if (activeBar) activeBar.classList.remove("active");
+      activeBar = null;
+    }}
+
+    function rowHtml(kind, label, seconds) {{
+      var icon = kind === "down" ? "\u2715" : (kind === "autherr" ? "\u26A0" : "\u2713");
+      var mins = Math.round(seconds / 60);
+      var dur;
+      if (mins < 60) {{
+        dur = mins + " menit";
+      }} else {{
+        var h = Math.floor(mins / 60), m = mins % 60;
+        dur = m === 0 ? (h + " jam") : (h + " jam " + m + " menit");
+      }}
+      return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
+             '</span><span class="daypop-row-label">' + label + '</span><span class="daypop-row-dur">' + dur + '</span></div>';
+    }}
+
     document.querySelectorAll(".bar").forEach(function (bar) {{
       bar.addEventListener("click", function (e) {{
+        e.stopPropagation();
         var wasActive = bar.classList.contains("active");
         document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
-        if (!wasActive) bar.classList.add("active");
-        e.stopPropagation();
+        if (wasActive) {{ closePop(); return; }}
+
+        var status = bar.dataset.status;
+        if (status === "nodata") return;  // nothing to show yet for that day
+
+        bar.classList.add("active");
+        activeBar = bar;
+        popDate.textContent = bar.dataset.date;
+
+        var incidents = [];
+        try {{ incidents = JSON.parse(bar.dataset.incidents || "[]"); }}
+        catch (err) {{ incidents = []; }}
+
+        var body = "";
+        if (incidents.length === 0) {{
+          var okLabel = status === "up" ? "Beroperasi Normal" : "Tidak ada rincian tersedia";
+          body = '<div class="daypop-row ok"><span class="daypop-row-icon">\u2713</span>' +
+                 '<span class="daypop-row-label">' + okLabel + '</span></div>';
+        }} else {{
+          incidents.forEach(function (inc) {{
+            body += rowHtml(inc.kind, inc.label, inc.seconds);
+          }});
+        }}
+        if (bar.dataset.pct) {{
+          body += '<div class="daypop-pct">' + bar.dataset.pct + '% aktif hari itu</div>';
+        }}
+        popBody.innerHTML = body;
+
+        var r = bar.getBoundingClientRect();
+        var wrap = document.querySelector(".wrap").getBoundingClientRect();
+        pop.classList.remove("arrow-up", "arrow-down");
+        var popWidth = pop.offsetWidth || 300;
+        var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, wrap.left), wrap.right - popWidth);
+        var spaceAbove = r.top;
+        if (spaceAbove > 220) {{
+          pop.style.top = (r.top - 12) + "px";
+          pop.style.left = left + "px";
+          pop.style.transform = "translateY(-100%)";
+          pop.classList.add("arrow-down");
+        }} else {{
+          pop.style.top = (r.bottom + 12) + "px";
+          pop.style.left = left + "px";
+          pop.style.transform = "translateY(0)";
+          pop.classList.add("arrow-up");
+        }}
+        pop.classList.add("open");
       }});
     }});
-    document.addEventListener("click", function () {{
-      document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
+
+    popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
+    document.addEventListener("click", function (e) {{
+      if (pop.classList.contains("open") && !pop.contains(e.target)) closePop();
     }});
+    window.addEventListener("scroll", closePop, {{ passive: true }});
   </script>
 </body>
 </html>
