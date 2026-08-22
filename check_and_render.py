@@ -670,7 +670,24 @@ html = f'''<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>meshnode.id MQTT Status</title>
 <meta name="description" content="Status langsung broker MQTT publik meshnode.id">
-<meta http-equiv="refresh" content="60">
+<script>
+  // 2026-08-22: was a plain <meta http-equiv="refresh" content="60">.
+  // GitHub Pages serves this page with Cache-Control: max-age=600 (a
+  // platform default we can't override, no custom-headers support) --
+  // a bare meta-refresh just re-navigates to the SAME URL, which a
+  // normal reload is allowed to satisfy straight from the browser's
+  // HTTP cache without ever hitting the network. Confirmed live: a
+  // real viewer kept seeing the identical incident data (down to the
+  // exact same durations) across several manual refreshes minutes
+  // apart, up to 10 minutes stale, silently contradicting the "tiap 2
+  // menit" text on this same page. Appending a cache-busting query
+  // param forces a genuinely new URL each cycle, so the disk cache
+  // can never satisfy it -- location.replace (not .href) so this
+  // doesn't pile up in browser history on every cycle.
+  setTimeout(function () {{
+    location.replace(location.pathname + "?_=" + Date.now());
+  }}, 60000);
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
