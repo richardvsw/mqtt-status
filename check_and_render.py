@@ -309,7 +309,16 @@ save_json(STATE_PATH, state)
 today_str = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
 today_bucket = history.setdefault(today_str, {})
 for host, b in brokers.items():
-    slot = today_bucket.setdefault(host, {"up": 0, "total": 0})
+    # "down"/"auth_error" keys added 2026-08-22 alongside the tri-state
+    # check itself -- lets the per-day bar's tooltip say WHICH kind of
+    # failure a day had (see day_bar_html below) instead of just a bare
+    # percentage. Older days recorded before this existed simply lack
+    # these keys; day_bar_html treats that as "breakdown unknown" rather
+    # than assuming either value, since a plain TCP check genuinely
+    # can't tell them apart after the fact.
+    slot = today_bucket.setdefault(host, {"up": 0, "total": 0, "down": 0, "auth_error": 0})
+    slot.setdefault("down", 0)
+    slot.setdefault("auth_error", 0)
     slot["total"] += 1
     # Raw result, not the confirmed/public one -- the 90-day bar strip
     # already has a "warn" (partial) tier for exactly this kind of noise,
@@ -318,6 +327,10 @@ for host, b in brokers.items():
     # whole change exists to avoid on the CURRENT-status banner/rows).
     if b["raw_reachable"]:
         slot["up"] += 1
+    elif b["auth_error"]:
+        slot["auth_error"] += 1
+    else:
+        slot["down"] += 1
 cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
 for d in [d for d in history if d < cutoff_date]:
     del history[d]
@@ -343,6 +356,19 @@ def day_bar_html(host):
             pct = slot["up"] / slot["total"] * 100
             cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
             tip = f"{d}: {pct:.0f}% aktif"
+            # down/auth_error breakdown only exists for days recorded
+            # since 2026-08-22 -- older days silently omit it below
+            # rather than showing a misleading "0 down, 0 auth error"
+            # that isn't actually known.
+            down_n = slot.get("down", 0)
+            auth_n = slot.get("auth_error", 0)
+            if down_n or auth_n:
+                parts = []
+                if down_n:
+                    parts.append(f"{down_n}x down")
+                if auth_n:
+                    parts.append(f"{auth_n}x auth ditolak")
+                tip += f" ({', '.join(parts)})"
         bars.append(f'<div class="bar {cls}" data-tip="{tip}"></div>')
     return "".join(bars)
 
