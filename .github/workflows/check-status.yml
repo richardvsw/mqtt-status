@@ -13,7 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: pip install -q paho-mqtt
+      # MQTT_CHECK_USER/PASS: repo Settings -> Secrets and variables ->
+      # Actions -- added 2026-08-22 so the checker can do a real
+      # authenticated CONNECT instead of a plain TCP check (see
+      # check_and_render.py's own comments for why that matters). Never
+      # committed in plaintext.
       - run: python3 check_and_render.py
+        env:
+          MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
+          MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"

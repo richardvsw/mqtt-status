@@ -22,6 +22,17 @@ cd "$(dirname "$0")/../.."
 
 git pull --quiet origin main
 
+# 2026-08-22: check_and_render.py now does a real authenticated MQTT
+# CONNECT (not just a TCP check) so it can tell "broker down" apart from
+# "broker up but login rejected" -- see check_and_render.py's own
+# comments for why. Pulled fresh from secrets.json on every run (same
+# source meshtasticd's own config was seeded from) rather than baked
+# into this unit file, so a password rotation only needs updating in one
+# place.
+MQTT_CHECK_USER="$(python3 -c "import json; print(json.load(open('/opt/rivbot-ui/data/secrets.json')).get('mqtt_user',''))")"
+MQTT_CHECK_PASS="$(python3 -c "import json; print(json.load(open('/opt/rivbot-ui/data/secrets.json')).get('mqtt_pass',''))")"
+export MQTT_CHECK_USER MQTT_CHECK_PASS
+
 python3 check_and_render.py
 
 git add index.html history.json state.json log.jsonl brokers.json

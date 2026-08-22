@@ -26,6 +26,32 @@ from datetime import datetime, timezone, timedelta
 # needed on either side to tell the two apart.
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 
+# 2026-08-22 incident: a raw TCP connect (the old check_broker) reports a
+# broker "up" even when the account's credentials are being rejected at
+# the MQTT layer -- confirmed live during a real outage where all 5
+# brokers accepted the TCP handshake but every one replied "Connection
+# Refused: not authorised" (mosquitto CONNACK rc=5) to the real
+# idmeshnode login meshtasticd actually uses. This page showed "all
+# operational" the entire time. Doing a real authenticated CONNECT here
+# (paho-mqtt, connect+disconnect only, no subscribe) catches that
+# specific failure mode and reports it as its own "Auth Error" state,
+# distinct from a genuine network-level "Down" -- an auth rejection means
+# the broker itself is fine and the problem is the shared account, which
+# reads very differently to anyone watching this page than "broker is
+# down".
+#
+# Credentials: on the LXC this comes from the systemd unit's own
+# Environment= lines (deploy/systemd/mqtt-status-lxc.service) since this
+# box already has them for meshtasticd's own config; on GitHub Actions it
+# comes from the repo's Actions secrets (MQTT_CHECK_USER/MQTT_CHECK_PASS)
+# -- never committed in plaintext either place. A missing/empty
+# credential just skips the auth check and falls back to the old
+# TCP-only result (still better than crashing the whole page).
+import paho.mqtt.client as mqtt
+
+MQTT_CHECK_USER = os.environ.get("MQTT_CHECK_USER", "")
+MQTT_CHECK_PASS = os.environ.get("MQTT_CHECK_PASS", "")
+
 
 def get_ci_location():
     """Best-effort geolocation of the CURRENT run's own egress IP -- only
@@ -64,6 +90,59 @@ CHECK_RETRIES = 10
 RETRY_DELAY_SECONDS = 1.5
 
 
+def _mqtt_connect_attempt(host, timeout):
+    """One real MQTT CONNECT (not just a TCP handshake). Returns "up",
+    "auth_error", or "down". Falls back to a plain TCP check when no
+    credentials are configured, so this degrades gracefully rather than
+    reporting every broker as broken if the env vars are ever missing."""
+    if not MQTT_CHECK_USER:
+        try:
+            with socket.create_connection((host, MQTT_PORT), timeout=timeout):
+                return "up"
+        except Exception:
+            return "down"
+
+    result = {"status": None}
+
+    def on_connect(client, userdata, flags, rc, properties=None):
+        code = rc.value if hasattr(rc, "value") else rc
+        if code == 0:
+            result["status"] = "up"
+        elif code in (4, 5):  # bad username/password, not authorised
+            result["status"] = "auth_error"
+        else:
+            result["status"] = "down"
+        client.disconnect()
+
+    # paho-mqtt 2.x defaults to the VERSION2 callback API, whose
+    # on_connect signature/rc type differs from what's used below -- left
+    # implicit, the mismatch doesn't raise, it just means on_connect never
+    # actually assigns result["status"], silently degrading every real
+    # auth_error into a "down" (the timeout fallback) and defeating the
+    # entire point of this check. Confirmed via a live test run right
+    # after writing this, caught before it ever reached the public page.
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1,
+                          client_id=f"mqtt-status-check-{os.getpid()}-{int(time.time()*1000)}",
+                          protocol=mqtt.MQTTv311)
+    client.username_pw_set(MQTT_CHECK_USER, MQTT_CHECK_PASS)
+    client.on_connect = on_connect
+    try:
+        client.connect(host, MQTT_PORT, timeout)
+        client.loop_start()
+        waited = 0.0
+        while result["status"] is None and waited < timeout:
+            time.sleep(0.1)
+            waited += 0.1
+        client.loop_stop()
+        try:
+            client.disconnect()
+        except Exception:
+            pass
+    except Exception:
+        return "down"
+    return result["status"] or "down"
+
+
 def check_broker(host, timeout=5, retries=CHECK_RETRIES):
     """A single bad moment on the GitHub Actions runner's own network/DNS
     used to be enough to mark a broker down -- confirmed 2026-08-18: all 5
@@ -72,16 +151,24 @@ def check_broker(host, timeout=5, retries=CHECK_RETRIES):
     brokers was working the entire time. Retries here so a transient
     runner-side blip doesn't get reported as a real outage on the public
     page; a genuinely down broker still fails every attempt and gets
-    marked down same as before, just slower to confirm."""
+    marked down same as before, just slower to confirm.
+
+    Returns (status, latency_ms) where status is "up", "auth_error", or
+    "down". auth_error does not retry through the full loop the way "down"
+    does -- a rejected login is a deterministic result, not a transient
+    network blip, so retrying it just burns time for the same answer."""
     t0 = time.time()
+    last_status = "down"
     for attempt in range(retries):
-        try:
-            with socket.create_connection((host, MQTT_PORT), timeout=timeout):
-                return True, round((time.time() - t0) * 1000)
-        except Exception:
-            if attempt < retries - 1:
-                time.sleep(RETRY_DELAY_SECONDS)
-    return False, None
+        status = _mqtt_connect_attempt(host, timeout)
+        if status == "up":
+            return "up", round((time.time() - t0) * 1000)
+        if status == "auth_error":
+            return "auth_error", None
+        last_status = status
+        if attempt < retries - 1:
+            time.sleep(RETRY_DELAY_SECONDS)
+    return last_status, None
 
 
 def load_json(path, default):
@@ -140,16 +227,42 @@ if IS_CI:
 
 brokers = {}
 for host in BROKERS:
-    raw_reachable, latency_ms = check_broker(host)
+    raw_status, latency_ms = check_broker(host)  # "up" / "auth_error" / "down"
+    raw_reachable = raw_status == "up"
     st = state.setdefault(host, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
     st.setdefault("consecutive_fails", 0)
     st.setdefault("provisional_start", None)
+    # Auth-error tracking mirrors the down-tracking fields above exactly,
+    # just under its own keys, so the two failure modes get independent
+    # confirm-threshold debouncing and independent displayed durations
+    # instead of one clobbering the other's state.
+    st.setdefault("current_auth_start", None)
+    st.setdefault("consecutive_auth_fails", 0)
+    st.setdefault("provisional_auth_start", None)
 
-    if raw_reachable:
+    if raw_status == "up":
         st["consecutive_fails"] = 0
         st["provisional_start"] = None
         st["current_outage_start"] = None
-    else:
+        st["consecutive_auth_fails"] = 0
+        st["provisional_auth_start"] = None
+        st["current_auth_start"] = None
+    elif raw_status == "auth_error":
+        # Not a network outage -- don't touch the down-tracking fields.
+        st["consecutive_fails"] = 0
+        st["provisional_start"] = None
+        st["current_outage_start"] = None
+        st["consecutive_auth_fails"] += 1
+        if st["provisional_auth_start"] is None:
+            st["provisional_auth_start"] = now
+        if st["consecutive_auth_fails"] >= CONFIRM_THRESHOLD:
+            st["current_auth_start"] = st["provisional_auth_start"]
+        else:
+            st["current_auth_start"] = None
+    else:  # "down"
+        st["consecutive_auth_fails"] = 0
+        st["provisional_auth_start"] = None
+        st["current_auth_start"] = None
         st["consecutive_fails"] += 1
         if st["provisional_start"] is None:
             st["provisional_start"] = now
@@ -175,17 +288,20 @@ for host in BROKERS:
     if raw_reachable:
         st[LATENCY_STATE_KEY] = latency_ms
 
-    # Only shown as Down once confirmed -- a single run's raw failure
-    # (consecutive_fails == 1) still shows Operational publicly, exactly
-    # so an unconfirmed blip never produces a false "down" reading.
+    # Only shown as Down/Auth Error once confirmed -- a single run's raw
+    # failure still shows Operational publicly, exactly so an unconfirmed
+    # blip never produces a false reading.
     confirmed_down = st["current_outage_start"] is not None
+    confirmed_auth = st["current_auth_start"] is not None
     brokers[host] = {
-        "reachable": not confirmed_down,
+        "reachable": not confirmed_down and not confirmed_auth,
         "raw_reachable": raw_reachable,
+        "auth_error": confirmed_auth,
         "latency_ms": latency_ms,
         "lxc_latency_ms": st.get("lxc_latency_ms"),
         "actions_latency_ms": st.get("actions_latency_ms"),
         "current_outage_start": st["current_outage_start"],
+        "current_auth_start": st["current_auth_start"],
     }
 
 save_json(STATE_PATH, state)
@@ -241,6 +357,7 @@ actions_city = (meta.get("actions_location") or "").split(",")[0]
 rows = []
 up_count = 0
 down_hosts = []
+auth_hosts = []
 for host in BROKERS:
     b = brokers[host]
     if b["reachable"]:
@@ -255,6 +372,10 @@ for host in BROKERS:
         if b["actions_latency_ms"] is not None:
             parts.append(f'<span class="ping ping-ci">{b["actions_latency_ms"]}ms</span>')
         status_label = "Operational · " + " · ".join(parts) if parts else "Operational"
+    elif b["auth_error"]:
+        dur = fmt_duration(now - b["current_auth_start"]) if b["current_auth_start"] else "?"
+        status_label, status_class = f"Auth Ditolak · {dur}", "autherr"
+        auth_hosts.append(host)
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
         status_label, status_class = f"Down · {dur}", "down"
@@ -271,10 +392,21 @@ for host in BROKERS:
 total = len(BROKERS)
 if up_count == total:
     banner_class, banner_text, banner_icon = "ok", "Semua Broker Beroperasi Normal", "✓"
+elif up_count == 0 and len(auth_hosts) == total:
+    # Every broker reachable but rejecting the shared login -- a very
+    # different (and differently actionable) situation than the network
+    # actually being down, so it gets its own banner wording entirely
+    # rather than folding into "Semua Broker Down".
+    banner_class, banner_text, banner_icon = "crit", "Semua Broker Menolak Autentikasi", "✕"
 elif up_count == 0:
     banner_class, banner_text, banner_icon = "crit", "Semua Broker Down", "✕"
 else:
-    banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(down_hosts)} Down", "!"
+    parts = []
+    if down_hosts:
+        parts.append(f"{', '.join(down_hosts)} Down")
+    if auth_hosts:
+        parts.append(f"{', '.join(auth_hosts)} Auth Ditolak")
+    banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(parts)}", "!"
 
 updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
 commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
@@ -355,6 +487,7 @@ html = f'''<!doctype html>
     animation: pulse 2.2s ease-out infinite;
   }}
   .dot.down {{ background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }}
+  .dot.autherr {{ background: var(--warn); box-shadow: 0 0 0 3px var(--warn-dim); }}
   @keyframes pulse {{
     0% {{ transform: scale(.6); opacity: .8; }}
     100% {{ transform: scale(2.1); opacity: 0; }}
@@ -371,6 +504,7 @@ html = f'''<!doctype html>
   }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
+  .status.autherr {{ color: var(--warn); }}
   /* Ping values color-coded by source instead of repeating "(city name)"
      text on every row -- see .ping-legend for what each color means. */
   .ping-lxc {{ color: var(--ok); }}
