@@ -742,9 +742,12 @@ html = f'''<!doctype html>
           }});
         }}
         if (bar.dataset.pct) {{
+          // Both phrasings lead with "Aktif {{pct}}%..." so the pair reads
+          // as one consistent sentence pattern -- only the qualifier
+          // changes depending on whether the day is still in progress.
           var pctLabel = bar.dataset.today === "1"
-            ? bar.dataset.pct + '% aktif sejauh ini hari ini'
-            : bar.dataset.pct + '% aktif hari itu';
+            ? 'Aktif ' + bar.dataset.pct + '% dari waktu berjalan hari ini'
+            : 'Aktif ' + bar.dataset.pct + '% pada hari itu';
           body += '<div class="daypop-pct">' + pctLabel + '</div>';
         }}
         popBody.innerHTML = body;
