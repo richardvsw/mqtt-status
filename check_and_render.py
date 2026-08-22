@@ -670,9 +670,18 @@ def day_bar_html(host):
         # call time same as any Python name), applied here too so a
         # 5-minute blip and a 4-hour outage don't render as the exact
         # same flat red on the main page either.
-        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
-        color = _severity_color(pct)
         incidents = _clip_incidents_to_day(host, d)
+        if incidents:
+            cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+            color = _severity_color(pct)
+        else:
+            # No confirmed incident (>= MIN_INCIDENT_SECONDS) touched
+            # this day -- render it fully green like a clean day, even
+            # if raw pct dipped from sub-2-min blips that no longer
+            # count as real incidents (matches the popover's own
+            # unconditional "Beroperasi Normal" fallback).
+            cls = "up"
+            color = _severity_color(100.0)
         import html as _html
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
         # is_today marks the one bar whose percentage is against
@@ -1486,9 +1495,13 @@ def _cal_day_cell(host, d):
     # cls kept for data-status (drives the popover's no-incident-data
     # fallback icon/label -- see the click handler's noDataStyle map) --
     # the VISIBLE color comes from the gradient below, not this bucket.
-    cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
-    color = _severity_color(pct)
     incidents = _combined_bot_incidents(d) if host == BOT_COMBINED_KEY else _clip_incidents_to_day(host, d)
+    if incidents:
+        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+        color = _severity_color(pct)
+    else:
+        cls = "up"
+        color = _severity_color(100.0)
     incidents_attr = _html_mod.escape(json.dumps(incidents), quote=True)
     is_today = "1" if d == _today_str_cal else "0"
     return (

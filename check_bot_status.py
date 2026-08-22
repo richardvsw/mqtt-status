@@ -378,9 +378,13 @@ def day_bar_html(svc):
             continue
         total = slot["total"]
         pct = slot["up"] / total * 100
-        color = _severity_color(pct)
-        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
         incidents = _clip_incidents_to_day(svc, d)
+        if incidents:
+            color = _severity_color(pct)
+            cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+        else:
+            color = _severity_color(100.0)
+            cls = "up"
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
         is_today = "1" if d == day_labels[-1] else "0"
         bars.append(
