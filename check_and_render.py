@@ -1330,9 +1330,9 @@ html = f'''<!doctype html>
           // a green "no details available" row.
           var noDataStyle = {{
             up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
-            down: {{ cls: "down",    icon: "✕", label: "Tidak ada rincian tersedia" }},
-            warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada rincian tersedia" }}
-          }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada rincian tersedia" }};
+            down: {{ cls: "down",    icon: "✕", label: "Tidak ada insiden tercatat" }},
+            warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada insiden tercatat" }}
+          }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada insiden tercatat" }};
           body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
                  '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
         }} else {{
@@ -1806,9 +1806,9 @@ uptime_html = f"""<!doctype html>
       if (incidents.length === 0) {{
         var noDataStyle = {{
           up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
-          down: {{ cls: "down",    icon: "✕", label: "Tidak ada rincian tersedia" }},
-          warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada rincian tersedia" }}
-        }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada rincian tersedia" }};
+          down: {{ cls: "down",    icon: "✕", label: "Tidak ada insiden tercatat" }},
+          warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada insiden tercatat" }}
+        }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada insiden tercatat" }};
         body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
                '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
       }} else {{

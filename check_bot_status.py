@@ -742,7 +742,7 @@ html = f'''<!doctype html>
         if (incidents.length === 0) {{
           var ok = status === "up";
           body = '<div class="daypop-row ' + (ok ? "ok" : "down") + '"><span class="daypop-row-icon">' + (ok ? "✓" : "✕") + '</span>' +
-                 '<span class="daypop-row-label">' + (ok ? "Beroperasi Normal" : "Tidak ada rincian tersedia") + '</span></div>';
+                 '<span class="daypop-row-label">' + (ok ? "Beroperasi Normal" : "Tidak ada insiden tercatat") + '</span></div>';
         }} else {{
           incidents.forEach(function (inc) {{ body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); }});
         }}
