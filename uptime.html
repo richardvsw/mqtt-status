@@ -45,12 +45,24 @@
   }
   .cal-component h3 { margin: 0 0 .8rem; font-size: .92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
   .cal-months { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+  /* 2026-08-22: .cal-month had no explicit width, relying on .cal-grid's
+     min(220px, 100%) to imply one -- a circular reference, since that
+     100% resolves against .cal-month's OWN width, which itself was only
+     ever going to come FROM the grid. Percentages against an
+     indeterminate auto-sized flex-item parent resolve toward their
+     min-content contribution instead, per spec, so both the grid and
+     the month-head's available space collapsed much narrower than
+     intended -- confirmed live: the head's flex space-between had
+     almost no room, so the month name and % ran together with no gap.
+     Fixed by giving .cal-month its own explicit width -- .cal-grid's
+     min(220px, 100%) now resolves cleanly against a KNOWN parent size. */
+  .cal-month { width: min(220px, 100%); }
   .cal-month-head {
     display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
     color: var(--muted); margin-bottom: .4rem;
   }
   .cal-month-pct { font-variant-numeric: tabular-nums; color: var(--text); }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: min(220px, 100%); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; }
   .cal-day { aspect-ratio: 1; border-radius: 3px; background: var(--border); }
   .cal-day.empty { background: transparent; }
   .cal-day.up { background: var(--ok); }
@@ -71,7 +83,7 @@
       <h3>mqtt.meshnode.id</h3>
       <div class="cal-months">
       <div class="cal-month">
-        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">87.56%</span></div>
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">87.57%</span></div>
         <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day down" title="2026-08-15"></div><div class="cal-day down" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
       </div></div>
     </div>
@@ -79,7 +91,7 @@
       <h3>mqtt1.meshnode.id</h3>
       <div class="cal-months">
       <div class="cal-month">
-        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">92.34%</span></div>
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">92.35%</span></div>
         <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day warn" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
       </div></div>
     </div>
@@ -95,7 +107,7 @@
       <h3>mqtt3.meshnode.id</h3>
       <div class="cal-months">
       <div class="cal-month">
-        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">92.01%</span></div>
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">91.95%</span></div>
         <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
       </div></div>
     </div>
@@ -103,7 +115,7 @@
       <h3>mqtt4.meshnode.id</h3>
       <div class="cal-months">
       <div class="cal-month">
-        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">90.03%</span></div>
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">89.96%</span></div>
         <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
       </div></div>
     </div>
@@ -111,11 +123,11 @@
       <h3>mqtt5.meshnode.id</h3>
       <div class="cal-months">
       <div class="cal-month">
-        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">83.72%</span></div>
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">84.09%</span></div>
         <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day nodata" title="2026-08-15"></div><div class="cal-day nodata" title="2026-08-16"></div><div class="cal-day nodata" title="2026-08-17"></div><div class="cal-day nodata" title="2026-08-18"></div><div class="cal-day nodata" title="2026-08-19"></div><div class="cal-day nodata" title="2026-08-20"></div><div class="cal-day nodata" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
       </div></div>
     </div>
-    <footer>Diperbarui 22 Aug 2026, 20:19:33 WIB</footer>
+    <footer>Diperbarui 22 Aug 2026, 21:11:17 WIB</footer>
   </div>
 </body>
 </html>

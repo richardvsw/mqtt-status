@@ -1391,12 +1391,24 @@ uptime_html = f"""<!doctype html>
   }}
   .cal-component h3 {{ margin: 0 0 .8rem; font-size: .92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }}
   .cal-months {{ display: flex; flex-wrap: wrap; gap: 1.4rem; }}
+  /* 2026-08-22: .cal-month had no explicit width, relying on .cal-grid's
+     min(220px, 100%) to imply one -- a circular reference, since that
+     100% resolves against .cal-month's OWN width, which itself was only
+     ever going to come FROM the grid. Percentages against an
+     indeterminate auto-sized flex-item parent resolve toward their
+     min-content contribution instead, per spec, so both the grid and
+     the month-head's available space collapsed much narrower than
+     intended -- confirmed live: the head's flex space-between had
+     almost no room, so the month name and % ran together with no gap.
+     Fixed by giving .cal-month its own explicit width -- .cal-grid's
+     min(220px, 100%) now resolves cleanly against a KNOWN parent size. */
+  .cal-month {{ width: min(220px, 100%); }}
   .cal-month-head {{
     display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
     color: var(--muted); margin-bottom: .4rem;
   }}
   .cal-month-pct {{ font-variant-numeric: tabular-nums; color: var(--text); }}
-  .cal-grid {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: min(220px, 100%); }}
+  .cal-grid {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; }}
   .cal-day {{ aspect-ratio: 1; border-radius: 3px; background: var(--border); }}
   .cal-day.empty {{ background: transparent; }}
   .cal-day.up {{ background: var(--ok); }}
