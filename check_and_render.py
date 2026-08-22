@@ -566,6 +566,51 @@ for host in BROKERS:
           </div>
         </div>''')
 
+# "Past Incidents" -- same spirit as status.claude.com's own past-
+# incidents log: a chronological, per-day list of what actually broke,
+# not just the bar-strip summary. Reuses REAL_INCIDENTS (already built
+# for the day-popovers) rather than a separate data source, and reuses
+# _clip_incidents_to_day so a single multi-day outage still splits at
+# midnight the same way it does in the popovers. Days with zero
+# incidents across every broker are skipped entirely rather than
+# padded with "no incidents" filler -- with 6 brokers over 30 days,
+# an exhaustive per-day list (like Claude's) would mostly be noise;
+# only days something actually happened are worth showing here.
+incident_days = []
+for d in reversed(day_labels):
+    day_entries = []
+    for host in BROKERS:
+        for inc in _clip_incidents_to_day(host, d):
+            day_entries.append({"host": host, **inc})
+    if day_entries:
+        day_entries.sort(key=lambda e: e["start_clock"])
+        incident_days.append((d, day_entries))
+
+incident_kind_icon = {"down": "✕", "autherr": "⚠"}
+
+
+def _incident_log_html():
+    if not incident_days:
+        return '<p class="note">Tidak ada insiden tercatat dalam 30 hari terakhir.</p>'
+    blocks = []
+    for d, entries in incident_days:
+        rows_html = "".join(
+            f'''<div class="incident-row">
+              <span class="incident-icon {e["kind"]}">{incident_kind_icon.get(e["kind"], "✕")}</span>
+              <span class="incident-host">{e["host"]}</span>
+              <span class="incident-label">{e["label"]}</span>
+              <span class="incident-time">{e["start_clock"]}–{e["end_clock"]} WIB</span>
+            </div>'''
+            for e in entries
+        )
+        blocks.append(f'''
+        <div class="incident-day">
+          <div class="incident-date">{d}</div>
+          {rows_html}
+        </div>''')
+    return "".join(blocks)
+
+
 total = len(BROKERS)
 if up_count == total:
     banner_class, banner_text, banner_icon = "ok", "Semua Broker Beroperasi Normal", "✓"
@@ -755,10 +800,16 @@ html = f'''<!doctype html>
   .daypop::before {{
     content: ""; position: absolute; width: 10px; height: 10px; background: var(--surf2);
     border-left: 1px solid var(--border); border-top: 1px solid var(--border);
-    transform: rotate(45deg);
+    /* 2026-08-22: this had no horizontal position at all before --
+       it just sat at the pseudo-element's default (effectively the
+       card's left edge) regardless of which bar was actually clicked.
+       --arrow-x is set from JS to the real bar's center, clamped to
+       stay within the card itself even when the CARD had to shift to
+       avoid overflowing the viewport (see the click handler). */
+    left: var(--arrow-x, 20px); transform: translateX(-50%) rotate(45deg);
   }}
   .daypop.arrow-up::before {{ top: -6px; }}
-  .daypop.arrow-down::before {{ bottom: -6px; transform: rotate(225deg); }}
+  .daypop.arrow-down::before {{ bottom: -6px; transform: translateX(-50%) rotate(225deg); }}
   .daypop-head {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: .55rem; }}
   .daypop-date {{ font-weight: 650; font-size: .9rem; }}
   .daypop-close {{
@@ -798,6 +849,26 @@ html = f'''<!doctype html>
   .legend .lg-down {{ background: var(--crit); }}
 
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
+
+  .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
+  .incident-log {{
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }}
+  .incident-day {{ padding: .9rem 1.1rem; border-bottom: 1px solid var(--border-soft); }}
+  .incident-day:last-child {{ border-bottom: none; }}
+  .incident-date {{ font-weight: 600; font-size: .82rem; margin-bottom: .55rem; }}
+  .incident-row {{
+    display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
+    padding: .3rem 0; flex-wrap: wrap;
+  }}
+  .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
+  .incident-icon.down {{ color: var(--crit); }}
+  .incident-icon.autherr {{ color: var(--warn); }}
+  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); flex-shrink: 0; }}
+  .incident-label {{ font-weight: 600; }}
+  .incident-time {{ color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }}
+
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: .8rem; }}
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
@@ -825,6 +896,8 @@ html = f'''<!doctype html>
       <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
     </div>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
+    <h2 class="section-title">Riwayat Insiden</h2>
+    <div class="incident-log">{_incident_log_html()}</div>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <div class="daypop" id="daypop">
@@ -923,10 +996,31 @@ html = f'''<!doctype html>
         popBody.innerHTML = body;
 
         var r = bar.getBoundingClientRect();
-        var wrap = document.querySelector(".wrap").getBoundingClientRect();
         pop.classList.remove("arrow-up", "arrow-down");
         var popWidth = pop.offsetWidth || 300;
-        var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, wrap.left), wrap.right - popWidth);
+        // 2026-08-22: clamped against the real viewport edges (with an
+        // 8px margin) instead of just the .wrap container's own bounds
+        // -- .wrap's right edge IS effectively the viewport edge on
+        // narrow phone widths, so the old clamp let the card render
+        // flush against the actual screen edge with zero breathing
+        // room, which read as "cut off" (confirmed live: a click on the
+        // rightmost/"today" bar produced exactly this). The 8px margin
+        // applies on both sides now.
+        var margin = 8;
+        var left = Math.min(
+          Math.max(r.left + r.width / 2 - popWidth / 2, margin),
+          window.innerWidth - popWidth - margin
+        );
+        // The card's own left edge can end up anywhere within that
+        // clamp range, independent of the bar's true center -- so the
+        // arrow needs its OWN position, not just "centered on the
+        // card". This is the fix for the arrow pointing at the wrong
+        // spot: it's the bar's center MINUS wherever the card actually
+        // landed, further clamped so it can't render outside the
+        // card's own rounded corners.
+        var arrowX = r.left + r.width / 2 - left;
+        arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
+        pop.style.setProperty("--arrow-x", arrowX + "px");
         var spaceAbove = r.top;
         if (spaceAbove > 220) {{
           pop.style.top = (r.top - 12) + "px";
