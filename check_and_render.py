@@ -489,6 +489,60 @@ REAL_INCIDENTS = _build_real_incidents()
 KIND_LABEL = {"down": "Down", "autherr": "Autentikasi Ditolak"}
 
 
+BOT_ENTITIES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
+BOT_ENTITY_LABEL = {
+    "mesh_bot": "mesh_bot.service",
+    "meshtasticd": "meshtasticd.service",
+    "lxc-monitor": "Server (Cikarang)",
+}
+
+
+def _build_bot_incidents():
+    """Same reconstruction approach as _build_real_incidents() above,
+    just against bot_log.jsonl's simpler {"checks": {svc: "up"/"down"}}
+    shape (written by check_bot_status.py) instead of log.jsonl's
+    per-broker down/auth_error tri-state. Only ever "down" as a kind --
+    a systemd service doesn't have an auth-rejected equivalent."""
+    MERGE_GAP_SECONDS = 600
+    incidents = {}
+    open_incident = {}
+    try:
+        with open("bot_log.jsonl") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts = rec.get("ts")
+                for svc, status in rec.get("checks", {}).items():
+                    incidents.setdefault(svc, [])
+                    if status == "down":
+                        if svc not in open_incident:
+                            open_incident[svc] = ts
+                    elif svc in open_incident:
+                        start = open_incident.pop(svc)
+                        lst = incidents[svc]
+                        if lst and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
+                            lst[-1]["end"] = ts
+                        else:
+                            lst.append({"start": start, "end": ts})
+    except FileNotFoundError:
+        pass
+    for svc, start in open_incident.items():
+        lst = incidents.setdefault(svc, [])
+        if lst and lst[-1]["end"] is not None and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
+            lst[-1]["end"] = None
+        else:
+            lst.append({"start": start, "end": None})
+    return incidents
+
+
+BOT_REAL_INCIDENTS = _build_bot_incidents()
+
+
 def _clip_incidents_to_day(host, d):
     """Real incidents clipped to day `d`'s [00:00, 24:00) WIB window,
     each carrying real clock start/end (or day boundaries for whatever
@@ -496,7 +550,9 @@ def _clip_incidents_to_day(host, d):
     day_start = datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=WIB).timestamp()
     day_end = day_start + 86400
     out = []
-    for inc in REAL_INCIDENTS.get(host, []):
+    is_bot = host in BOT_ENTITIES
+    source = BOT_REAL_INCIDENTS if is_bot else REAL_INCIDENTS
+    for inc in source.get(host, []):
         seg_start = max(inc["start"], day_start)
         seg_end_raw = inc["end"] if inc["end"] is not None else now
         seg_end = min(seg_end_raw, day_end)
@@ -517,8 +573,8 @@ def _clip_incidents_to_day(host, d):
         else:
             end_clock = datetime.fromtimestamp(seg_end, WIB).strftime("%H:%M")
         out.append({
-            "kind": inc["kind"],
-            "label": KIND_LABEL[inc["kind"]],
+            "kind": "down" if is_bot else inc["kind"],
+            "label": "Down" if is_bot else KIND_LABEL[inc["kind"]],
             "seconds": seg_end - seg_start,
             "start_clock": datetime.fromtimestamp(seg_start, WIB).strftime("%H:%M"),
             "end_clock": end_clock,
@@ -1375,6 +1431,22 @@ with open(OUT_PATH, "w") as f:
     f.write(html)
 print(f"wrote {OUT_PATH} ({up_count}/{total} brokers up)")
 
+# 2026-08-22: everything from here on (uptime.html) reads a MERGED
+# history that also includes mesh_bot/meshtasticd/lxc-monitor, written
+# by check_bot_status.py (same repo, same LXC run) -- reassigning the
+# `history` name rather than threading a second dict through every
+# function below, since day_bar_html/host_uptime_pct for index.html's
+# own rows have ALL already run and finished by this point.
+_bot_history = {}
+if os.path.isdir("bot_history"):
+    for _fname in sorted(os.listdir("bot_history")):
+        if _fname.endswith(".json"):
+            _bot_history.update(load_json(os.path.join("bot_history", _fname), {}))
+_merged_history = {d: dict(hosts) for d, hosts in history.items()}
+for _d, _entities in _bot_history.items():
+    _merged_history.setdefault(_d, {}).update(_entities)
+history = _merged_history
+
 
 # ── Historical uptime calendar page (uptime.html) ──────────────────────────
 # Mirrors status.claude.com's own /uptime page (confirmed live against the
@@ -1470,8 +1542,11 @@ def _broker_section_html(host, is_first):
 
 
 uptime_updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
-_broker_sections = "".join(_broker_section_html(h, h == BROKERS[0]) for h in BROKERS)
-_broker_options = "".join(f'<option value="{h}">{h}</option>' for h in BROKERS)
+_UPTIME_HOSTS = BROKERS + BOT_ENTITIES
+_UPTIME_LABELS = {h: h for h in BROKERS}
+_UPTIME_LABELS.update(BOT_ENTITY_LABEL)
+_broker_sections = "".join(_broker_section_html(h, h == _UPTIME_HOSTS[0]) for h in _UPTIME_HOSTS)
+_broker_options = "".join(f'<option value="{h}">{_UPTIME_LABELS[h]}</option>' for h in _UPTIME_HOSTS)
 
 uptime_html = f"""<!doctype html>
 <html lang="id">

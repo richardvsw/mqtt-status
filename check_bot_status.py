@@ -33,6 +33,12 @@ import urllib.error
 from datetime import datetime, timezone, timedelta
 
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
+# Only this box ever writes to it (see ntfy.py's own comment) --
+# GitHub Actions has no path to it at all, same as mesh_bot/
+# meshtasticd themselves.
+EVENT_LOG_PATH = "/opt/rivbot-ui/data/bot_events.jsonl"
+EVENT_LOG_MAX_AGE_DAYS = 30
+EVENT_LOG_MAX_ENTRIES = 200
 
 WIB = timezone(timedelta(hours=7))
 HISTORY_DIR = "bot_history"
@@ -385,6 +391,51 @@ else:
 
 updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
 
+def _load_bot_events():
+    """Every entry ntfy.notify() has ever logged (restarts, broker
+    switches, NodeDB resets, etc.) -- real human-written context from
+    whoever/whatever triggered the action, not re-derived from the
+    generic up/down checks above. Newest first, capped by both age and
+    count so this section can't grow unbounded."""
+    if IS_CI or not os.path.exists(EVENT_LOG_PATH):
+        return []
+    cutoff = now - EVENT_LOG_MAX_AGE_DAYS * 86400
+    events = []
+    try:
+        with open(EVENT_LOG_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("ts", 0) >= cutoff:
+                    events.append(rec)
+    except Exception:
+        return []
+    events.sort(key=lambda r: r["ts"], reverse=True)
+    return events[:EVENT_LOG_MAX_ENTRIES]
+
+
+def _event_log_html():
+    events = _load_bot_events()
+    if IS_CI:
+        return ""  # section omitted entirely on the Actions side -- nothing to show, not "no events"
+    if not events:
+        return '<p class="note">Belum ada kejadian tercatat.</p>'
+    rows_html = "".join(
+        f'''<div class="event-row">
+          <div class="event-time">{datetime.fromtimestamp(e["ts"], WIB).strftime("%d %b, %H:%M WIB")}</div>
+          <div class="event-body"><div class="event-title">{e.get("title", "")}</div><div class="event-msg">{e.get("message", "")}</div></div>
+        </div>'''
+        for e in events
+    )
+    return f'''
+    <h2 class="section-title">Riwayat Kejadian</h2>
+    <div class="event-log">{rows_html}</div>'''
+
 html = f'''<!doctype html>
 <html lang="id">
 <script>
@@ -526,6 +577,13 @@ html = f'''<!doctype html>
   .row-caption {{ margin-top: .5rem; font-size: .68rem; gap: .5rem; }}
   .caption-line {{ flex: 1; height: 1px; background: var(--border); min-width: 1.2rem; }}
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
+  .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
+  .event-log {{ background: var(--surf); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); overflow: hidden; }}
+  .event-row {{ display: flex; gap: .9rem; padding: .8rem 1.1rem; border-top: 1px solid var(--border-soft); }}
+  .event-row:first-child {{ border-top: none; }}
+  .event-time {{ flex-shrink: 0; width: 6.5rem; color: var(--faint); font-size: .72rem; font-variant-numeric: tabular-nums; padding-top: .1rem; }}
+  .event-title {{ font-weight: 600; font-size: .84rem; }}
+  .event-msg {{ color: var(--muted); font-size: .78rem; margin-top: .15rem; line-height: 1.4; }}
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
@@ -541,6 +599,7 @@ html = f'''<!doctype html>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
     <div class="panel">{"".join(rows)}</div>
+    {_event_log_html()}
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <div class="daypop" id="daypop">
