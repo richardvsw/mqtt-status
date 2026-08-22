@@ -574,7 +574,7 @@ html = f'''<!doctype html>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --bg: #0c1220; --bg2: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
+    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
     --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
     --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
     --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
@@ -587,9 +587,7 @@ html = f'''<!doctype html>
   html {{ color-scheme: dark; }}
   body {{
     margin: 0; min-height: 100vh; color: var(--text);
-    background:
-      radial-gradient(900px 420px at 50% -10%, rgba(91,140,255,.10), transparent 60%),
-      linear-gradient(180deg, var(--bg2), var(--bg) 340px);
+    background: var(--bg);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
   }}
