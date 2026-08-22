@@ -15,3 +15,4 @@
 {"ts": 1787415601.0512085, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787416378.6486268, "checks": {"lxc-monitor": "up"}}
 {"ts": 1787417017.8375387, "checks": {"lxc-monitor": "down"}}
+{"ts": 1787417519.053442, "checks": {"lxc-monitor": "down"}}
