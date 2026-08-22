@@ -629,7 +629,7 @@ html = f'''<!doctype html>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
-    <p class="note">🔀 Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover).{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
+    <p class="note">Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover).{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
     <div class="panel">{"".join(rows)}</div>
     {_event_log_html()}
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
