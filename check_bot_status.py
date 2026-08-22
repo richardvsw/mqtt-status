@@ -53,7 +53,7 @@ SERVICES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
 SERVICE_LABEL = {
     "mesh_bot": "mesh_bot.service",
     "meshtasticd": "meshtasticd.service",
-    "lxc-monitor": "LXC Monitor",
+    "lxc-monitor": "Server (Cikarang)",
 }
 
 
@@ -541,7 +541,6 @@ html = f'''<!doctype html>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal — data diperbarui tiap 2 menit (LXC) / dicek tiap ~10 menit (GitHub Actions, hanya memantau apakah LXC masih hidup)</div>
     <div class="panel">{"".join(rows)}</div>
-    <p class="note">"LXC Monitor" bukan layanan bot itu sendiri -- ini menunjukkan apakah box yang menjalankan pengecekan mesh_bot/meshtasticd masih hidup. GitHub Actions tidak bisa memeriksa mesh_bot/meshtasticd secara langsung (layanan privat di jaringan rumah), jadi baris itu hanya bisa dikonfirmasi dari LXC sendiri -- kalau LXC down, baris ini yang akan menunjukkan berapa lama.</p>
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <div class="daypop" id="daypop">
