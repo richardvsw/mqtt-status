@@ -3,16 +3,18 @@
 # check-status.yml's own check-and-commit logic exactly, just running
 # locally instead of on a GitHub Actions runner.
 #
-# Why this exists alongside the still-unchanged GitHub Actions workflow,
-# not instead of it: this box sits near Indonesia (~5-30ms to these
-# brokers); the Actions runner is on US/EU infra (~600-750ms to the same
-# brokers, confirmed 2026-08-19). Running the check from here gives
-# accurate latency numbers and a much tighter check interval whenever
-# this box is up. The Actions workflow needs NO changes to act as a
-# fallback -- it already just checks-and-commits-if-changed every ~10
-# min regardless of what else pushed since; if this box goes quiet, the
-# next Actions run is simply the freshest thing again, no explicit
-# "is the LXC alive" detection required anywhere.
+# Why this exists alongside the GitHub Actions workflow, not instead of
+# it: this box sits near Indonesia (~5-30ms to these brokers); the
+# Actions runner is on US/EU infra (~600-750ms to the same brokers,
+# confirmed 2026-08-19). Running the check from here gives accurate
+# latency numbers and a much tighter check interval whenever this box is
+# up. THIS side is the primary publisher; check-status.yml's own "Skip
+# publish if the LXC already did recently" step (added 2026-08-22) makes
+# it defer to whatever this script just pushed, only actually publishing
+# when this box has been quiet for a while -- that's what makes it a
+# real fallback instead of two independent writers racing each other
+# every cycle (confirmed live: that race was failing the Actions job
+# and emailing failure notifications regularly before the guard existed).
 #
 # Commits under a distinct identity (not the "RiV-Bot" identity used for
 # manual/design-work commits, not "github-actions[bot]") so the commit
@@ -20,7 +22,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-git pull --quiet origin main
+git pull --rebase --quiet origin main
 
 # 2026-08-22: check_and_render.py now does a real authenticated MQTT
 # CONNECT (not just a TCP check) so it can tell "broker down" apart from
@@ -41,6 +43,27 @@ if git diff --cached --quiet; then
 else
     git -c user.name="mqtt-status-lxc" -c user.email="lxc@rivbot.local" \
         commit --quiet -m "Update status (LXC) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    git push --quiet origin main
-    echo "mqtt-status-lxc: published"
+    # This box is the primary publisher and Actions now defers to it, so
+    # a real collision should be rare -- but not impossible right at the
+    # boundary of Actions' own 5-min defer window. 2 retries is enough
+    # margin for that narrow case without this oneshot unit hanging
+    # around; -X ours keeps this run's freshly-computed data on
+    # conflict, same reasoning as the Actions side.
+    pushed=0
+    for i in 1 2; do
+        if git push --quiet origin main; then
+            pushed=1
+            break
+        fi
+        echo "mqtt-status-lxc: push rejected (attempt $i), rebasing and retrying"
+        git fetch --quiet origin main
+        git -c user.name="mqtt-status-lxc" -c user.email="lxc@rivbot.local" \
+            rebase --quiet -X ours origin/main
+    done
+    if [ "$pushed" = "1" ]; then
+        echo "mqtt-status-lxc: published"
+    else
+        echo "mqtt-status-lxc: failed to push after retries"
+        exit 1
+    fi
 fi
