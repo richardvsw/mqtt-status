@@ -60,7 +60,7 @@ python3 check_and_render.py
 # docstring for the full LXC-vs-Actions split.
 python3 check_bot_status.py
 
-git add index.html history state.json log.jsonl brokers.json notice.json \n    bot-status.html bot_history bot_state.json bot_log.jsonl
+git add index.html history state.json log.jsonl brokers.json notice.json bot-status.html bot_history bot_state.json bot_log.jsonl
 if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else

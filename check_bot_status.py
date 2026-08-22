@@ -26,6 +26,7 @@ capabilities:
 """
 import json
 import os
+import socket
 import subprocess
 import time
 import urllib.request
@@ -54,6 +55,36 @@ CONFIRM_THRESHOLD = 2
 # for the exact same kind of margin), so a normal single missed cycle
 # never false-alarms.
 LXC_STALE_SECONDS = 15 * 60
+
+def _current_failover_target():
+    """mqtt.rivi.my.id is a CNAME an external DNS failover job
+    (update_dns.py, GitHub-Actions-only) repoints at whichever broker
+    is currently healthy -- resolving it live here shows what's
+    ACTUALLY configured right now, not just what the failover job last
+    intended. Matched by resolved IP rather than reading the CNAME
+    target directly (stdlib socket doesn't expose a CNAME lookup, only
+    final A-record resolution). brokers.json is read directly here
+    (not imported from check_and_render.py -- these run as separate
+    top-level scripts, not modules)."""
+    try:
+        target_ip = socket.gethostbyname("mqtt.rivi.my.id")
+    except Exception:
+        return None
+    try:
+        with open("brokers.json") as f:
+            candidates = json.load(f)
+    except Exception:
+        return None
+    for host in candidates:
+        try:
+            if socket.gethostbyname(host) == target_ip:
+                return host
+        except Exception:
+            continue
+    return None
+
+
+_failover_target = _current_failover_target()
 
 SERVICES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
 SERVICE_LABEL = {
@@ -598,6 +629,7 @@ html = f'''<!doctype html>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
+    <p class="note">🔀 Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover).{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
     <div class="panel">{"".join(rows)}</div>
     {_event_log_html()}
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
