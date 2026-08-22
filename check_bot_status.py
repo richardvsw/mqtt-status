@@ -740,9 +740,8 @@ html = f'''<!doctype html>
         try {{ incidents = JSON.parse(bar.dataset.incidents || "[]"); }} catch (err) {{ incidents = []; }}
         var body = "";
         if (incidents.length === 0) {{
-          var ok = status === "up";
-          body = '<div class="daypop-row ' + (ok ? "ok" : "down") + '"><span class="daypop-row-icon">' + (ok ? "✓" : "✕") + '</span>' +
-                 '<span class="daypop-row-label">' + (ok ? "Beroperasi Normal" : "Tidak ada insiden tercatat") + '</span></div>';
+          body = '<div class="daypop-row ok"><span class="daypop-row-icon">✓</span>' +
+                 '<span class="daypop-row-label">Beroperasi Normal</span></div>';
         }} else {{
           incidents.forEach(function (inc) {{ body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); }});
         }}

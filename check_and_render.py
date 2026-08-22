@@ -1328,13 +1328,8 @@ html = f'''<!doctype html>
           // icon/color now matches bar.dataset.status (the same value
           // that colors the bar itself), so a red/down day can't render
           // a green "no details available" row.
-          var noDataStyle = {{
-            up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
-            down: {{ cls: "down",    icon: "✕", label: "Tidak ada insiden tercatat" }},
-            warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada insiden tercatat" }}
-          }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada insiden tercatat" }};
-          body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
-                 '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
+          body = '<div class="daypop-row ok"><span class="daypop-row-icon">✓</span>' +
+                 '<span class="daypop-row-label">Beroperasi Normal</span></div>';
         }} else {{
           incidents.forEach(function (inc) {{
             body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
@@ -1804,13 +1799,8 @@ uptime_html = f"""<!doctype html>
       try {{ incidents = JSON.parse(cell.dataset.incidents || "[]"); }} catch (err) {{ incidents = []; }}
       var body = "";
       if (incidents.length === 0) {{
-        var noDataStyle = {{
-          up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
-          down: {{ cls: "down",    icon: "✕", label: "Tidak ada insiden tercatat" }},
-          warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada insiden tercatat" }}
-        }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada insiden tercatat" }};
-        body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
-               '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
+        body = '<div class="daypop-row ok"><span class="daypop-row-icon">✓</span>' +
+               '<span class="daypop-row-label">Beroperasi Normal</span></div>';
       }} else {{
         incidents.forEach(function (inc) {{ body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); }});
       }}
