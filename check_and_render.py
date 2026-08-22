@@ -86,11 +86,20 @@ OUT_PATH = "index.html"
 # 2026-08-22: dropped from 90 -> 30 to match the reference layout
 # (status.claude.com) -- at 90 days each bar was too thin on mobile to
 # reliably tap; 30 keeps every bar wide enough for the new click-to-open
-# popover below to feel deliberate rather than fiddly. Existing history
-# beyond 30 days simply stops being *displayed* -- the trim logic a few
-# lines down only deletes what's now unreachably old, so this is a
-# display-window change, not a data-loss one for anything within 30 days.
+# popover below to feel deliberate rather than fiddly. This is ONLY the
+# main page's display window now -- see HISTORY_RETENTION_DAYS below for
+# how much history is actually kept (the calendar/uptime.html page reads
+# the full retained range, not just this).
 HISTORY_DAYS = 30
+# 2026-08-22: was the SAME value as HISTORY_DAYS (history.json deleted
+# anything older every run), which meant there was never more than 30
+# days of data to show even once the status.claude.com-style calendar
+# page (uptime.html) existed to show it. Decoupled so retention keeps
+# accumulating (up to ~13 months) independent of the main page's
+# display window. Per-day storage cost is trivial (a handful of int
+# fields per host per day), so keeping over a year of it is cheap.
+HISTORY_RETENTION_DAYS = 400
+UPTIME_OUT_PATH = "uptime.html"
 
 CHECK_RETRIES = 10
 RETRY_DELAY_SECONDS = 1.5
@@ -345,7 +354,7 @@ for host, b in brokers.items():
         slot["auth_error"] += 1
     else:
         slot["down"] += 1
-cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
+cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_RETENTION_DAYS)).strftime("%Y-%m-%d")
 for d in [d for d in history if d < cutoff_date]:
     del history[d]
 save_json(HISTORY_PATH, history)
@@ -921,6 +930,9 @@ html = f'''<!doctype html>
   .legend .lg-down {{ background: var(--crit); }}
 
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
+  .uptime-link {{ text-align: center; margin: -1.2rem 0 1.8rem; font-size: .8rem; }}
+  .uptime-link a {{ color: var(--accent); text-decoration: none; }}
+  .uptime-link a:hover {{ text-decoration: underline; }}
 
   .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
   .incident-log {{
@@ -968,6 +980,7 @@ html = f'''<!doctype html>
       </button>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif — data diperbarui tiap 10 menit</div>
+    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
       <span>{HISTORY_DAYS} hari lalu</span>
@@ -1227,3 +1240,185 @@ html = f'''<!doctype html>
 with open(OUT_PATH, "w") as f:
     f.write(html)
 print(f"wrote {OUT_PATH} ({up_count}/{total} brokers up)")
+
+
+# ── Historical uptime calendar page (uptime.html) ──────────────────────────
+# Mirrors status.claude.com's own /uptime page (confirmed live against the
+# real site, 2026-08-22): a weekday-aligned calendar grid, one small
+# colored square per day, grouped by month, with a per-month uptime %
+# header -- distinct from the main page's 30-day horizontal bar strip,
+# which is a different (denser, click-for-detail) view of the same
+# underlying data and stays as-is.
+import calendar as _calendar_mod
+
+
+def _month_status(host, year, month):
+    """List of (day_num_or_None, css_class) for one calendar month --
+    None for the leading placeholder cells before day 1 (weekday
+    alignment, Monday-first). css_class matches the existing
+    up/warn/down/nodata coloring the main page's day bars already use,
+    so this page reads as the same visual language, not a new one."""
+    first_weekday, days_in_month = _calendar_mod.monthrange(year, month)
+    cells = [(None, "empty")] * first_weekday
+    today_str = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
+    for day in range(1, days_in_month + 1):
+        d = f"{year:04d}-{month:02d}-{day:02d}"
+        if d > today_str:
+            break  # don't render future days at all, not even as nodata
+        slot = history.get(d, {}).get(host)
+        if not slot or slot.get("total", 0) == 0:
+            cells.append((day, "nodata"))
+            continue
+        pct = slot["up"] / slot["total"] * 100
+        cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+        cells.append((day, cls))
+    return cells
+
+
+def _month_uptime_pct(host, year, month):
+    up_sum, total_sum = 0, 0
+    _, days_in_month = _calendar_mod.monthrange(year, month)
+    for day in range(1, days_in_month + 1):
+        slot = history.get(f"{year:04d}-{month:02d}-{day:02d}", {}).get(host)
+        if slot:
+            up_sum += slot.get("up", 0)
+            total_sum += slot.get("total", 0)
+    return (up_sum / total_sum * 100) if total_sum else None
+
+
+def _months_with_data(host, max_months=13):
+    """(year, month) tuples ascending, from the earliest month this host
+    has ANY recorded data through the current month -- capped at
+    max_months so the page stays bounded even once retention has been
+    running a long time (status.claude.com itself only ever shows 3;
+    13 gives real headroom without becoming unbounded)."""
+    host_days = sorted(d for d, hosts in history.items() if host in hosts)
+    if not host_days:
+        return []
+    start_y, start_m = (int(x) for x in host_days[0].split("-")[:2])
+    end_dt = datetime.fromtimestamp(now, WIB)
+    months = []
+    y, m = start_y, start_m
+    while (y, m) <= (end_dt.year, end_dt.month):
+        months.append((y, m))
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    return months[-max_months:]
+
+
+def _month_block_html(host, year, month):
+    cells = _month_status(host, year, month)
+    pct = _month_uptime_pct(host, year, month)
+    pct_label = f"{pct:.2f}%" if pct is not None else "-"
+    month_name = _calendar_mod.month_name[month]
+    cell_parts = []
+    for day, cls in cells:
+        if day:
+            cell_parts.append(f'<div class="cal-day {cls}" title="{year:04d}-{month:02d}-{day:02d}"></div>')
+        else:
+            cell_parts.append('<div class="cal-day empty"></div>')
+    cells_html = "".join(cell_parts)
+    return (
+        '\n      <div class="cal-month">\n'
+        f'        <div class="cal-month-head"><span>{month_name} {year}</span><span class="cal-month-pct">{pct_label}</span></div>\n'
+        f'        <div class="cal-grid">{cells_html}</div>\n'
+        '      </div>'
+    )
+
+
+def _broker_uptime_section(host):
+    months = _months_with_data(host)
+    if not months:
+        return f'<div class="cal-component"><h3>{host}</h3><p class="note">Belum ada data.</p></div>'
+    blocks = "".join(_month_block_html(host, y, m) for y, m in months)
+    return (
+        f'\n    <div class="cal-component">\n'
+        f'      <h3>{host}</h3>\n'
+        f'      <div class="cal-months">{blocks}</div>\n'
+        '    </div>'
+    )
+
+
+uptime_updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
+_uptime_sections = "".join(_broker_uptime_section(h) for h in BROKERS)
+
+uptime_html = f"""<!doctype html>
+<html lang="id">
+<script>
+(function () {{
+  try {{
+    if (localStorage.getItem("mqtt-status-theme") === "light") {{
+      document.documentElement.setAttribute("data-theme", "light");
+    }}
+  }} catch (e) {{}}
+}})();
+</script>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Uptime — meshnode.id MQTT Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
+    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
+    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+  }}
+  html {{ color-scheme: dark; }}
+  html[data-theme="light"] {{ color-scheme: light; }}
+  :root[data-theme="light"] {{
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }}
+  .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
+  h1 {{ font-size: 1.15rem; font-weight: 650; margin: 0 0 .3rem; }}
+  .back {{ color: var(--accent); text-decoration: none; font-size: .85rem; }}
+  .back:hover {{ text-decoration: underline; }}
+  .cal-component {{
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1.1rem 1.2rem; margin-top: 1.2rem;
+  }}
+  .cal-component h3 {{ margin: 0 0 .8rem; font-size: .92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }}
+  .cal-months {{ display: flex; flex-wrap: wrap; gap: 1.4rem; }}
+  .cal-month-head {{
+    display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
+    color: var(--muted); margin-bottom: .4rem;
+  }}
+  .cal-month-pct {{ font-variant-numeric: tabular-nums; color: var(--text); }}
+  .cal-grid {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: min(220px, 100%); }}
+  .cal-day {{ aspect-ratio: 1; border-radius: 3px; background: var(--border); }}
+  .cal-day.empty {{ background: transparent; }}
+  .cal-day.up {{ background: var(--ok); }}
+  .cal-day.warn {{ background: var(--warn); }}
+  .cal-day.down {{ background: var(--crit); }}
+  .cal-day.nodata {{ background: var(--border); }}
+  .note {{ color: var(--faint); font-size: .82rem; }}
+  footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Kembali ke status</a>
+    <h1 style="margin-top:.8rem">Riwayat Uptime</h1>
+    <p class="note">Kotak berwarna = satu hari. Arahkan kursor buat lihat tanggalnya.</p>
+    {_uptime_sections}
+    <footer>Diperbarui {uptime_updated_str}</footer>
+  </div>
+</body>
+</html>
+"""
+
+with open(UPTIME_OUT_PATH, "w") as f:
+    f.write(uptime_html)
+print(f"wrote {UPTIME_OUT_PATH}")

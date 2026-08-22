@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="id">
+<script>
+(function () {
+  try {
+    if (localStorage.getItem("mqtt-status-theme") === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  } catch (e) {}
+})();
+</script>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Uptime — meshnode.id MQTT Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
+    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
+    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+  }
+  html { color-scheme: dark; }
+  html[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="light"] {
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --warn: #f76707; --crit: #d63939; --accent: #066fd1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }
+  h1 { font-size: 1.15rem; font-weight: 650; margin: 0 0 .3rem; }
+  .back { color: var(--accent); text-decoration: none; font-size: .85rem; }
+  .back:hover { text-decoration: underline; }
+  .cal-component {
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1.1rem 1.2rem; margin-top: 1.2rem;
+  }
+  .cal-component h3 { margin: 0 0 .8rem; font-size: .92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
+  .cal-months { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+  .cal-month-head {
+    display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
+    color: var(--muted); margin-bottom: .4rem;
+  }
+  .cal-month-pct { font-variant-numeric: tabular-nums; color: var(--text); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: min(220px, 100%); }
+  .cal-day { aspect-ratio: 1; border-radius: 3px; background: var(--border); }
+  .cal-day.empty { background: transparent; }
+  .cal-day.up { background: var(--ok); }
+  .cal-day.warn { background: var(--warn); }
+  .cal-day.down { background: var(--crit); }
+  .cal-day.nodata { background: var(--border); }
+  .note { color: var(--faint); font-size: .82rem; }
+  footer { color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Kembali ke status</a>
+    <h1 style="margin-top:.8rem">Riwayat Uptime</h1>
+    <p class="note">Kotak berwarna = satu hari. Arahkan kursor buat lihat tanggalnya.</p>
+    
+    <div class="cal-component">
+      <h3>mqtt.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">87.56%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day down" title="2026-08-15"></div><div class="cal-day down" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <div class="cal-component">
+      <h3>mqtt1.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">92.34%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day warn" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <div class="cal-component">
+      <h3>mqtt2.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">93.45%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <div class="cal-component">
+      <h3>mqtt3.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">92.01%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <div class="cal-component">
+      <h3>mqtt4.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">90.03%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day up" title="2026-08-15"></div><div class="cal-day up" title="2026-08-16"></div><div class="cal-day up" title="2026-08-17"></div><div class="cal-day up" title="2026-08-18"></div><div class="cal-day up" title="2026-08-19"></div><div class="cal-day up" title="2026-08-20"></div><div class="cal-day up" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <div class="cal-component">
+      <h3>mqtt5.meshnode.id</h3>
+      <div class="cal-months">
+      <div class="cal-month">
+        <div class="cal-month-head"><span>August 2026</span><span class="cal-month-pct">83.72%</span></div>
+        <div class="cal-grid"><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day nodata" title="2026-08-01"></div><div class="cal-day nodata" title="2026-08-02"></div><div class="cal-day nodata" title="2026-08-03"></div><div class="cal-day nodata" title="2026-08-04"></div><div class="cal-day nodata" title="2026-08-05"></div><div class="cal-day nodata" title="2026-08-06"></div><div class="cal-day nodata" title="2026-08-07"></div><div class="cal-day nodata" title="2026-08-08"></div><div class="cal-day nodata" title="2026-08-09"></div><div class="cal-day nodata" title="2026-08-10"></div><div class="cal-day nodata" title="2026-08-11"></div><div class="cal-day nodata" title="2026-08-12"></div><div class="cal-day nodata" title="2026-08-13"></div><div class="cal-day nodata" title="2026-08-14"></div><div class="cal-day nodata" title="2026-08-15"></div><div class="cal-day nodata" title="2026-08-16"></div><div class="cal-day nodata" title="2026-08-17"></div><div class="cal-day nodata" title="2026-08-18"></div><div class="cal-day nodata" title="2026-08-19"></div><div class="cal-day nodata" title="2026-08-20"></div><div class="cal-day nodata" title="2026-08-21"></div><div class="cal-day down" title="2026-08-22"></div></div>
+      </div></div>
+    </div>
+    <footer>Diperbarui 22 Aug 2026, 20:19:33 WIB</footer>
+  </div>
+</body>
+</html>
