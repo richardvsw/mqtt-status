@@ -1445,6 +1445,25 @@ if os.path.isdir("bot_history"):
 _merged_history = {d: dict(hosts) for d, hosts in history.items()}
 for _d, _entities in _bot_history.items():
     _merged_history.setdefault(_d, {}).update(_entities)
+
+# 2026-08-22: was 3 separate dropdown entries (mesh_bot, meshtasticd,
+# lxc-monitor) -- collapsed into one "Bot & Server" combined entry so
+# the dropdown reads as MQTT brokers + one bot row, not 6+3=9 items
+# where 3 of them are really facets of the same thing. The 3 underlying
+# per-service rows/history are completely untouched -- bot-status.html
+# still shows them individually; this combined slot is synthesized
+# ADDITIONALLY, summed across all 3 services' up/total for that day, so
+# a day where any one service degraded shows as partially degraded here
+# rather than needing its own separate row.
+BOT_COMBINED_KEY = "bot-combined"
+BOT_COMBINED_LABEL = "Bot & Server (RiV-meshBot)"
+for _d, _entities in _bot_history.items():
+    _up_sum = sum(e.get("up", 0) for e in _entities.values())
+    _total_sum = sum(e.get("total", 0) for e in _entities.values())
+    if _total_sum:
+        _merged_history.setdefault(_d, {})[BOT_COMBINED_KEY] = {
+            "up": _up_sum, "total": _total_sum, "down": _total_sum - _up_sum,
+        }
 history = _merged_history
 
 
@@ -1461,6 +1480,17 @@ import html as _html_mod
 _today_str_cal = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
 
 
+def _combined_bot_incidents(d):
+    out = []
+    for _svc in BOT_ENTITIES:
+        for inc in _clip_incidents_to_day(_svc, d):
+            inc = dict(inc)
+            inc["label"] = f"{BOT_ENTITY_LABEL[_svc]} Down"
+            out.append(inc)
+    out.sort(key=lambda x: x["start_clock"])
+    return out
+
+
 def _cal_day_cell(host, d):
     slot = history.get(d, {}).get(host)
     if not slot or slot.get("total", 0) == 0:
@@ -1472,7 +1502,7 @@ def _cal_day_cell(host, d):
     # the VISIBLE color comes from the gradient below, not this bucket.
     cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
     color = _severity_color(pct)
-    incidents = _clip_incidents_to_day(host, d)
+    incidents = _combined_bot_incidents(d) if host == BOT_COMBINED_KEY else _clip_incidents_to_day(host, d)
     incidents_attr = _html_mod.escape(json.dumps(incidents), quote=True)
     is_today = "1" if d == _today_str_cal else "0"
     return (
@@ -1542,9 +1572,9 @@ def _broker_section_html(host, is_first):
 
 
 uptime_updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
-_UPTIME_HOSTS = BROKERS + BOT_ENTITIES
+_UPTIME_HOSTS = BROKERS + [BOT_COMBINED_KEY]
 _UPTIME_LABELS = {h: h for h in BROKERS}
-_UPTIME_LABELS.update(BOT_ENTITY_LABEL)
+_UPTIME_LABELS[BOT_COMBINED_KEY] = BOT_COMBINED_LABEL
 _broker_sections = "".join(_broker_section_html(h, h == _UPTIME_HOSTS[0]) for h in _UPTIME_HOSTS)
 _broker_options = "".join(f'<option value="{h}">{_UPTIME_LABELS[h]}</option>' for h in _UPTIME_HOSTS)
 
