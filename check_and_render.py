@@ -92,6 +92,13 @@ OUT_PATH = "index.html"
 # display-window change, not a data-loss one for anything within 30 days.
 HISTORY_DAYS = 30
 
+# 2026-08-22: meshnode.id's maintainer announced (Discord) they're
+# adding a broker and migrating servers -- explains the down/auth-error
+# flapping several brokers are showing today that isn't anything on our
+# monitoring side. Empty string hides the banner entirely; clear this
+# once the migration settles rather than leaving a stale notice up.
+MAINTENANCE_NOTICE = "Meshnode.id lagi proses migrasi server — beberapa broker bisa gangguan sementara."
+
 
 CHECK_RETRIES = 10
 RETRY_DELAY_SECONDS = 1.5
@@ -652,6 +659,13 @@ else:
     banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(parts)}", "!"
 
 updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
+# Built OUTSIDE the big html f-string below, not inlined as a nested
+# conditional expression there -- a nested triple-quoted string would
+# prematurely close the outer f'''...''' literal.
+maintenance_banner_html = (
+    f'<div class="banner info"><span class="banner-icon">\u2139</span>{MAINTENANCE_NOTICE}</div>'
+    if MAINTENANCE_NOTICE else ""
+)
 commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
 
 html = f'''<!doctype html>
@@ -698,7 +712,7 @@ html = f'''<!doctype html>
     --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
     --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
     --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
-    --accent: #066fd1;
+    --accent: #066fd1; --accent-bg: #0d2136;
     --tooltip-bg: #232f42;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
   }}
@@ -711,7 +725,7 @@ html = f'''<!doctype html>
     --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
     --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
     --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
-    --accent: #066fd1;
+    --accent: #066fd1; --accent-bg: #e8f2fd;
     --tooltip-bg: #ffffff;
     --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
   }}
@@ -736,6 +750,8 @@ html = f'''<!doctype html>
   .banner.warn .banner-icon {{ background: var(--warn); color: #241c0d; }}
   .banner.crit {{ background: var(--crit-bg); color: var(--crit); }}
   .banner.crit .banner-icon {{ background: var(--crit); color: #250f0d; }}
+  .banner.info {{ background: var(--accent-bg); color: var(--accent); border-bottom: 1px solid var(--border-soft); }}
+  .banner.info .banner-icon {{ background: var(--accent); color: #eef6ff; }}
 
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
   .titlebar {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }}
@@ -945,6 +961,7 @@ html = f'''<!doctype html>
 </head>
 <body>
   <div class="banner {banner_class}"><span class="banner-icon">{banner_icon}</span>{banner_text}</div>
+  {maintenance_banner_html}
   <div class="wrap">
     <div class="titlebar">
       <span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1>
