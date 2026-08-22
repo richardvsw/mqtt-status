@@ -539,7 +539,7 @@ html = f'''<!doctype html>
       <h1>Status Bot — RiV-meshBot</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
-    <div class="sub"><b>{up_count}/{total}</b> layanan normal — data diperbarui tiap 2 menit (LXC) / dicek tiap ~10 menit (GitHub Actions, hanya memantau apakah LXC masih hidup)</div>
+    <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
     <div class="panel">{"".join(rows)}</div>
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>

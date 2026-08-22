@@ -622,6 +622,33 @@ lxc_city = (meta.get("lxc_location") or "").split(",")[0]
 actions_city = (meta.get("actions_location") or "").split(",")[0]
 bot_display_name = meta.get("lxc_bot_name") or "RiV-meshBot"
 
+def _current_failover_target():
+    """mqtt.rivi.my.id is a CNAME an external DNS failover job
+    (update_dns.py, GitHub-Actions-only) repoints at whichever broker
+    is currently healthy -- resolving it live here (rather than
+    re-deriving update_dns.py's own "pick the best broker" logic) shows
+    what's ACTUALLY configured right now, not just what the failover
+    job last intended, which is the more honest thing to display if
+    those two ever drift apart. Matched by resolved IP rather than
+    reading the CNAME target directly (stdlib socket doesn't expose a
+    CNAME lookup, only final A-record resolution) -- comparing against
+    each candidate broker's own resolved IP is simpler than adding a
+    DNS library dependency for one footer line."""
+    try:
+        target_ip = socket.gethostbyname("mqtt.rivi.my.id")
+    except Exception:
+        return None
+    for host in BROKERS:
+        try:
+            if socket.gethostbyname(host) == target_ip:
+                return host
+        except Exception:
+            continue
+    return None
+
+
+_failover_target = _current_failover_target()
+
 rows = []
 up_count = 0
 down_hosts = []
@@ -1080,6 +1107,7 @@ html = f'''<!doctype html>
       <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
     </div>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
+    <p class="note">🔀 <b>mqtt.rivi.my.id</b> — pakai ini di node kamu, otomatis pindah ke broker yang sehat kalau ada yang down (DNS failover).{f" Saat ini menunjuk ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
