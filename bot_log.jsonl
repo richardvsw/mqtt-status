@@ -14,26 +14,5 @@
 {"ts": 1787415137.1733925, "checks": {"lxc-monitor": "up"}}
 {"ts": 1787415601.0512085, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787416378.6486268, "checks": {"lxc-monitor": "up"}}
-{"ts": 1787417017.8375387, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787417519.053442, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787418133.1037424, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787418744.8034313, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787419417.1405015, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787419933.1813514, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787420536.2247357, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787421124.339205, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787421728.7800987, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787422425.7803688, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787422924.0689995, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787423542.5362933, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787424117.439393, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787424705.0226402, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787425265.819102, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787425874.100225, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787426456.968726, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787427060.7988348, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787427663.1686072, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787428260.3539696, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787428866.6711583, "checks": {"lxc-monitor": "down"}}
 {"ts": 1787428967.75753, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787429469.920487, "checks": {"lxc-monitor": "up"}}
