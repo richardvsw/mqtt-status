@@ -563,6 +563,15 @@ commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
 
 html = f'''<!doctype html>
 <html lang="id">
+<script>
+(function () {{
+  try {{
+    if (localStorage.getItem("mqtt-status-theme") === "light") {{
+      document.documentElement.setAttribute("data-theme", "light");
+    }}
+  }} catch (e) {{}}
+}})();
+</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -585,6 +594,17 @@ html = f'''<!doctype html>
   }}
   * {{ box-sizing: border-box; }}
   html {{ color-scheme: dark; }}
+  html[data-theme="light"] {{ color-scheme: light; }}
+  :root[data-theme="light"] {{
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
+    --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
+    --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
+    --accent: #066fd1;
+    --tooltip-bg: #ffffff;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
+  }}
   body {{
     margin: 0; min-height: 100vh; color: var(--text);
     background: var(--bg);
@@ -608,7 +628,17 @@ html = f'''<!doctype html>
   .banner.crit .banner-icon {{ background: var(--crit); color: #250f0d; }}
 
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
-  .titlebar {{ display: flex; align-items: baseline; gap: .55rem; margin-bottom: .35rem; }}
+  .titlebar {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }}
+  .titlebar h1 {{ flex: 1; }}
+  .theme-toggle {{
+    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+    border-radius: 6px; border: 1px solid var(--border); background: var(--surf); color: var(--muted);
+    cursor: pointer; flex-shrink: 0;
+  }}
+  .theme-toggle:hover {{ color: var(--text); border-color: var(--faint); }}
+  .theme-toggle .icon-moon {{ display: none; }}
+  :root[data-theme="light"] .theme-toggle .icon-sun {{ display: none; }}
+  :root[data-theme="light"] .theme-toggle .icon-moon {{ display: block; }}
   .titlebar .glyph {{ font-size: 1.25rem; line-height: 1; }}
   .titlebar h1 {{ font-size: 1.2rem; font-weight: 650; margin: 0; letter-spacing: -.2px; }}
   .sub {{ color: var(--muted); font-size: .86rem; margin-bottom: 1.8rem; }}
@@ -743,7 +773,13 @@ html = f'''<!doctype html>
 <body>
   <div class="banner {banner_class}"><span class="banner-icon">{banner_icon}</span>{banner_text}</div>
   <div class="wrap">
-    <div class="titlebar"><span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1></div>
+    <div class="titlebar">
+      <span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Ganti tema terang/gelap" title="Ganti tema terang/gelap">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif — data diperbarui tiap 10 menit</div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
@@ -858,6 +894,20 @@ html = f'''<!doctype html>
         }}
         pop.classList.add("open");
       }});
+    }});
+
+    var themeToggle = document.getElementById("theme-toggle");
+    themeToggle.addEventListener("click", function () {{
+      var root = document.documentElement;
+      var isLight = root.getAttribute("data-theme") === "light";
+      if (isLight) {{
+        root.removeAttribute("data-theme");
+        try {{ localStorage.setItem("mqtt-status-theme", "dark"); }} catch (e) {{}}
+      }} else {{
+        root.setAttribute("data-theme", "light");
+        try {{ localStorage.setItem("mqtt-status-theme", "light"); }} catch (e) {{}}
+      }}
+      closePop();
     }});
 
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
