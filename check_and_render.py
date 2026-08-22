@@ -1014,59 +1014,21 @@ html = f'''<!doctype html>
              '</div><span class="daypop-row-dur">' + dur + '</span></div>';
     }}
 
-    document.querySelectorAll(".bar").forEach(function (bar) {{
-      bar.addEventListener("click", function (e) {{
-        e.stopPropagation();
-        var wasActive = bar.classList.contains("active");
-        document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
-        if (wasActive) {{ closePop(); return; }}
-
-        var status = bar.dataset.status;
-        if (status === "nodata") return;  // nothing to show yet for that day
-
-        bar.classList.add("active");
-        activeBar = bar;
-        popDate.textContent = bar.dataset.date;
-
-        var incidents = [];
-        try {{ incidents = JSON.parse(bar.dataset.incidents || "[]"); }}
-        catch (err) {{ incidents = []; }}
-
-        var body = "";
-        if (incidents.length === 0) {{
-          // 2026-08-22: this branch used to hardcode the green "ok"
-          // style/checkmark regardless of the real status -- confirmed
-          // live on mqtt5.meshnode.id: its very first-ever check failed
-          // (0% up that day), but since REAL_INCIDENTS only records a
-          // CONFIRMED outage (2 consecutive fails) and this was only 1,
-          // there was no incident to show, and the fallback showed a
-          // green checkmark + "no details" as if it were healthy. The
-          // icon/color now matches bar.dataset.status (the same value
-          // that colors the bar itself), so a red/down day can't render
-          // a green "no details available" row.
-          var noDataStyle = {{
-            up:   {{ cls: "ok",      icon: "\u2713", label: "Beroperasi Normal" }},
-            down: {{ cls: "down",    icon: "\u2715", label: "Tidak ada rincian tersedia" }},
-            warn: {{ cls: "autherr", icon: "\u26a0", label: "Tidak ada rincian tersedia" }}
-          }}[status] || {{ cls: "down", icon: "\u2715", label: "Tidak ada rincian tersedia" }};
-          body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
-                 '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
-        }} else {{
-          incidents.forEach(function (inc) {{
-            body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
-          }});
-        }}
-        if (bar.dataset.pct) {{
-          // Both phrasings lead with "Aktif {{pct}}%..." so the pair reads
-          // as one consistent sentence pattern -- only the qualifier
-          // changes depending on whether the day is still in progress.
-          var pctLabel = bar.dataset.today === "1"
-            ? 'Aktif ' + bar.dataset.pct + '% dari waktu berjalan hari ini'
-            : 'Aktif ' + bar.dataset.pct + '%';
-          body += '<div class="daypop-pct">' + pctLabel + '</div>';
-        }}
-        popBody.innerHTML = body;
-
+    // 2026-08-22: pulled out of the click handler so it can be re-run,
+    // not just computed once at click time. Real-device testing kept
+    // showing the arrow landing somewhere on the card's face instead of
+    // its edge, despite the exact same logic measuring correctly every
+    // time in automated headless testing -- the difference is Google
+    // Fonts: "Inter" loads over the network async (see the <link> in
+    // <head>), so a tap that lands before it's ready gets positioned
+    // against fallback-font layout, then the row text reflows (FOUT)
+    // once Inter arrives, changing the card's real height/edges out
+    // from under an arrow that was never told to recheck. A headless
+    // test with fonts already cached never hits this window. Re-running
+    // this on fonts.ready + resize (mobile browsers can also resize the
+    // viewport post-tap as the address bar collapses/expands) closes
+    // that gap regardless of which of those actually fires.
+    function positionPopover(bar) {{
         var r = bar.getBoundingClientRect();
         pop.classList.remove("arrow-up", "arrow-down");
         var popWidth = pop.offsetWidth || 300;
@@ -1135,8 +1097,72 @@ html = f'''<!doctype html>
         }}
         popArrow.style.left = (popRect.left + arrowX - 5) + "px";
         popArrow.classList.add("open");
+    }}
+
+    document.querySelectorAll(".bar").forEach(function (bar) {{
+      bar.addEventListener("click", function (e) {{
+        e.stopPropagation();
+        var wasActive = bar.classList.contains("active");
+        document.querySelectorAll(".bar.active").forEach(function (b) {{ b.classList.remove("active"); }});
+        if (wasActive) {{ closePop(); return; }}
+
+        var status = bar.dataset.status;
+        if (status === "nodata") return;  // nothing to show yet for that day
+
+        bar.classList.add("active");
+        activeBar = bar;
+        popDate.textContent = bar.dataset.date;
+
+        var incidents = [];
+        try {{ incidents = JSON.parse(bar.dataset.incidents || "[]"); }}
+        catch (err) {{ incidents = []; }}
+
+        var body = "";
+        if (incidents.length === 0) {{
+          // 2026-08-22: this branch used to hardcode the green "ok"
+          // style/checkmark regardless of the real status -- confirmed
+          // live on mqtt5.meshnode.id: its very first-ever check failed
+          // (0% up that day), but since REAL_INCIDENTS only records a
+          // CONFIRMED outage (2 consecutive fails) and this was only 1,
+          // there was no incident to show, and the fallback showed a
+          // green checkmark + "no details" as if it were healthy. The
+          // icon/color now matches bar.dataset.status (the same value
+          // that colors the bar itself), so a red/down day can't render
+          // a green "no details available" row.
+          var noDataStyle = {{
+            up:   {{ cls: "ok",      icon: "✓", label: "Beroperasi Normal" }},
+            down: {{ cls: "down",    icon: "✕", label: "Tidak ada rincian tersedia" }},
+            warn: {{ cls: "autherr", icon: "⚠", label: "Tidak ada rincian tersedia" }}
+          }}[status] || {{ cls: "down", icon: "✕", label: "Tidak ada rincian tersedia" }};
+          body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
+                 '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
+        }} else {{
+          incidents.forEach(function (inc) {{
+            body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
+          }});
+        }}
+        if (bar.dataset.pct) {{
+          var pctLabel = bar.dataset.today === "1"
+            ? 'Aktif ' + bar.dataset.pct + '% dari waktu berjalan hari ini'
+            : 'Aktif ' + bar.dataset.pct + '%';
+          body += '<div class="daypop-pct">' + pctLabel + '</div>';
+        }}
+        popBody.innerHTML = body;
+        positionPopover(bar);
       }});
     }});
+
+    // Re-position (never re-open) if the active popover's own layout
+    // might have shifted out from under it -- see positionPopover's own
+    // comment for why fonts/resize specifically.
+    if (document.fonts && document.fonts.ready) {{
+      document.fonts.ready.then(function () {{
+        if (activeBar && pop.classList.contains("open")) positionPopover(activeBar);
+      }});
+    }}
+    window.addEventListener("resize", function () {{
+      if (activeBar && pop.classList.contains("open")) positionPopover(activeBar);
+    }}, {{ passive: true }});
 
     var themeToggle = document.getElementById("theme-toggle");
     themeToggle.addEventListener("click", function () {{
