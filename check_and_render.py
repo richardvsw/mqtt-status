@@ -489,6 +489,40 @@ REAL_INCIDENTS = _build_real_incidents()
 KIND_LABEL = {"down": "Down", "autherr": "Autentikasi Ditolak"}
 
 
+def _build_raw_blips():
+    """Every individual failed check (raw_reachable=False or
+    auth_error=True), regardless of whether it ever confirmed into a
+    tracked REAL_INCIDENTS entry -- CONFIRM_THRESHOLD debouncing exists
+    so a single transient blip doesn't get PUBLICLY DISPLAYED as a full
+    "Down" status change (that's still correct, unchanged), but that's
+    different from having NO RECORD of it ever happening. Kept separate
+    from REAL_INCIDENTS rather than folded in, since these are single
+    points in time (one failed check), not a start/end range."""
+    blips = {}
+    try:
+        with open(LOG_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts = rec.get("ts")
+                for host, b in rec.get("brokers", {}).items():
+                    if b.get("auth_error"):
+                        blips.setdefault(host, []).append({"ts": ts, "kind": "autherr"})
+                    elif not b.get("raw_reachable", True):
+                        blips.setdefault(host, []).append({"ts": ts, "kind": "down"})
+    except FileNotFoundError:
+        pass
+    return blips
+
+
+RAW_BLIPS = _build_raw_blips()
+
+
 BOT_ENTITIES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
 BOT_ENTITY_LABEL = {
     "mesh_bot": "mesh_bot.service",
@@ -579,6 +613,32 @@ def _clip_incidents_to_day(host, d):
             "start_clock": datetime.fromtimestamp(seg_start, WIB).strftime("%H:%M"),
             "end_clock": end_clock,
         })
+    # Isolated failed checks that never confirmed into a tracked
+    # incident above -- skip any raw blip whose timestamp already
+    # falls inside a confirmed incident's own window (would just be a
+    # duplicate/noisy re-statement of the same real outage).
+    if not is_bot:
+        confirmed_ranges = [
+            (datetime.strptime(f"{d} {e['start_clock']}", "%Y-%m-%d %H:%M").replace(tzinfo=WIB).timestamp(),
+             day_end if e["end_clock"] in ("24:00", "sekarang") else
+             datetime.strptime(f"{d} {e['end_clock']}", "%Y-%m-%d %H:%M").replace(tzinfo=WIB).timestamp())
+            for e in out
+        ]
+        for blip in RAW_BLIPS.get(host, []):
+            ts = blip["ts"]
+            if not (day_start <= ts < day_end):
+                continue
+            if any(r0 <= ts <= r1 for r0, r1 in confirmed_ranges):
+                continue
+            clock = datetime.fromtimestamp(ts, WIB).strftime("%H:%M")
+            out.append({
+                "kind": blip["kind"],
+                "label": KIND_LABEL[blip["kind"]] + " (sesaat)",
+                "seconds": 0,
+                "start_clock": clock,
+                "end_clock": clock,
+            })
+        out.sort(key=lambda e: e["start_clock"])
     return out
 
 
@@ -1172,7 +1232,9 @@ html = f'''<!doctype html>
       var icon = kind === "down" ? "\u2715" : (kind === "autherr" ? "\u26A0" : "\u2713");
       var mins = Math.round(seconds / 60);
       var dur;
-      if (mins < 60) {{
+      if (seconds < 30) {{
+        dur = "sesaat";
+      }} else if (mins < 60) {{
         dur = mins + " menit";
       }} else {{
         var h = Math.floor(mins / 60), m = mins % 60;
@@ -1724,7 +1786,8 @@ uptime_html = f"""<!doctype html>
       var icon = kind === "down" ? "✕" : (kind === "autherr" ? "⚠" : "✓");
       var mins = Math.round(seconds / 60);
       var dur;
-      if (mins < 60) {{ dur = mins + " menit"; }}
+      if (seconds < 30) {{ dur = "sesaat"; }}
+      else if (mins < 60) {{ dur = mins + " menit"; }}
       else {{ var h = Math.floor(mins / 60), m = mins % 60; dur = m === 0 ? (h + " jam") : (h + " jam " + m + " menit"); }}
       var timeRange = (startClock && endClock)
         ? '<div class="daypop-row-time">' + startClock + '–' + endClock + ' WIB</div>' : '';
