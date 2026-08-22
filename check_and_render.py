@@ -406,9 +406,15 @@ def day_bar_html(host):
             incidents.append({"kind": "autherr", "label": "Auth Ditolak", "seconds": auth_n / total * day_seconds})
         import html as _html
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
+        # is_today marks the one bar whose percentage is against
+        # ELAPsed time so far, not a completed 24h -- the popover needs
+        # this to word the % line honestly ("so far today" vs "that
+        # day") instead of implying a finished day's stats for a day
+        # that's still in progress.
+        is_today = "1" if d == day_labels[-1] else "0"
         bars.append(
             f'<div class="bar {cls}" data-date="{d}" data-status="{cls}" '
-            f'data-pct="{pct:.0f}" data-incidents="{incidents_attr}"></div>')
+            f'data-pct="{pct:.0f}" data-today="{is_today}" data-incidents="{incidents_attr}"></div>')
     return "".join(bars)
 
 
@@ -736,7 +742,10 @@ html = f'''<!doctype html>
           }});
         }}
         if (bar.dataset.pct) {{
-          body += '<div class="daypop-pct">' + bar.dataset.pct + '% aktif hari itu</div>';
+          var pctLabel = bar.dataset.today === "1"
+            ? bar.dataset.pct + '% aktif sejauh ini hari ini'
+            : bar.dataset.pct + '% aktif hari itu';
+          body += '<div class="daypop-pct">' + pctLabel + '</div>';
         }}
         popBody.innerHTML = body;
 
