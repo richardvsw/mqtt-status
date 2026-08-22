@@ -1,9 +1,13 @@
 name: Check MQTT broker status
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"  # GitHub's scheduler doesn't guarantee exact timing under load -- 10 min keeps this reliable rather than requesting 5 and getting skipped runs
-  workflow_dispatch: {}  # lets you trigger a manual check/refresh from the Actions tab
+  # 2026-08-22: the built-in schedule trigger was removed -- an external
+  # cron job already calls this workflow's workflow_dispatch API on its
+  # own schedule. Keeping both meant every run fired twice (the
+  # workflow's own cron AND the external one), doubling MQTT connection
+  # attempts and Cloudflare API calls for zero benefit. workflow_dispatch
+  # alone is enough: the external cron is what actually drives this now.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
