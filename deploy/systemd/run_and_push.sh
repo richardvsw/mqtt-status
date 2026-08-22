@@ -54,7 +54,7 @@ export BOT_LONG_NAME
 
 python3 check_and_render.py
 
-git add index.html history.json state.json log.jsonl brokers.json notice.json
+git add index.html history state.json log.jsonl brokers.json notice.json
 if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else

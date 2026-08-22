@@ -79,7 +79,15 @@ MQTT_PORT = 1883
 with open("brokers.json") as _f:
     BROKERS = json.load(_f)
 
-HISTORY_PATH = "history.json"
+# 2026-08-22: was a single ever-growing history.json. Stayed genuinely
+# tiny even at full 400-day retention (~150-200KB), so this isn't a
+# size/perf fix -- it's for cleaner git diffs (a day's check only
+# touches THAT month's file, not one file every host/day ever
+# recorded lives in) and easier manual archiving/pruning of old
+# months later if wanted. One file per calendar month, e.g.
+# history/2026-08.json, each holding exactly the same per-day dict
+# shape the old flat file did for just that month's dates.
+HISTORY_DIR = "history"
 LOG_PATH = "log.jsonl"  # append-only per-run detail log -- kept separate so index.html only ever holds the current rendered state, not accumulating history
 STATE_PATH = "state.json"  # tracks current_outage_start per host, same purpose as mqtt_tap's own outage_state
 OUT_PATH = "index.html"
@@ -226,7 +234,37 @@ CONFIRM_THRESHOLD = 2
 
 now = time.time()
 state = load_json(STATE_PATH, {})
-history = load_json(HISTORY_PATH, {})
+def _load_history():
+    """Merges every history/YYYY-MM.json into one {date: {host: {...}}}
+    dict, same shape callers already expect from the old flat file --
+    every existing reader (day_bar_html, host_uptime_pct,
+    _months_with_data, _cal_day_cell, etc.) keeps working unchanged."""
+    merged = {}
+    if os.path.isdir(HISTORY_DIR):
+        for fname in sorted(os.listdir(HISTORY_DIR)):
+            if fname.endswith(".json"):
+                merged.update(load_json(os.path.join(HISTORY_DIR, fname), {}))
+    return merged
+
+
+def _save_history(history):
+    """Regroups by month and rewrites each month's file wholesale --
+    simpler and safer than trying to patch individual files in place,
+    and cheap given how small each month's slice is. A month that
+    dropped out of `history` entirely (every day trimmed past
+    HISTORY_RETENTION_DAYS) has its file deleted, not left stale."""
+    os.makedirs(HISTORY_DIR, exist_ok=True)
+    by_month = {}
+    for d, hosts in history.items():
+        by_month.setdefault(d[:7], {})[d] = hosts
+    for fname in os.listdir(HISTORY_DIR):
+        if fname.endswith(".json") and fname[:-5] not in by_month:
+            os.remove(os.path.join(HISTORY_DIR, fname))
+    for ym, days in by_month.items():
+        save_json(os.path.join(HISTORY_DIR, f"{ym}.json"), days)
+
+
+history = _load_history()
 
 # Where each source's ping is measured from -- LXC location is fixed
 # (this box doesn't move), CI location is looked up fresh every run
@@ -357,7 +395,7 @@ for host, b in brokers.items():
 cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_RETENTION_DAYS)).strftime("%Y-%m-%d")
 for d in [d for d in history if d < cutoff_date]:
     del history[d]
-save_json(HISTORY_PATH, history)
+_save_history(history)
 
 # append this run'''s raw result to the detail log -- one line per check,
 # never rewritten/truncated (unlike history.json/state.json which hold
@@ -506,6 +544,43 @@ def host_uptime_pct(host):
     return up_sum / total_sum * 100
 
 
+# 2026-08-22: status.claude.com's own calendar uses a continuous
+# green->yellow->orange->red gradient keyed to that day's real uptime %,
+# not a fixed 3-bucket scheme -- confirmed live against the reference
+# (a 4-hour outage day and a 5-minute blip both used to render as the
+# exact same flat red here, losing the severity signal a color gradient
+# is supposed to carry). Piecewise-linear interpolation between a few
+# named stops, closely matching the reference's own observed hues
+# (100% green #76ad2a through 0% red #e04343). Used by both day_bar_html
+# (main page) and _cal_day_cell (uptime.html) -- defined here, ahead of
+# day_bar_html's own definition below, since it's called from inside
+# that function and Python resolves module-level names at call time
+# against whatever has ALREADY executed, not definition order alone.
+_SEVERITY_STOPS = [
+    (100.0, (0x76, 0xad, 0x2a)),
+    (99.5,  (0x9a, 0xb4, 0x2a)),
+    (97.0,  (0xd9, 0xa9, 0x2a)),
+    (90.0,  (0xe6, 0xa8, 0x2a)),
+    (75.0,  (0xe8, 0x61, 0x36)),
+    (0.0,   (0xe0, 0x43, 0x43)),
+]
+
+
+def _severity_color(pct):
+    pct = max(0.0, min(100.0, pct))
+    for (p1, c1), (p2, c2) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:]):
+        if pct >= p1:
+            return f"#{c1[0]:02x}{c1[1]:02x}{c1[2]:02x}"
+        if pct >= p2:
+            t = (p1 - pct) / (p1 - p2)
+            r = round(c1[0] + (c2[0] - c1[0]) * t)
+            g = round(c1[1] + (c2[1] - c1[1]) * t)
+            b = round(c1[2] + (c2[2] - c1[2]) * t)
+            return f"#{r:02x}{g:02x}{b:02x}"
+    last = _SEVERITY_STOPS[-1][1]
+    return f"#{last[0]:02x}{last[1]:02x}{last[2]:02x}"
+
+
 def day_bar_html(host):
     bars = []
     for d in day_labels:
@@ -515,7 +590,15 @@ def day_bar_html(host):
             continue
         total = slot["total"]
         pct = slot["up"] / total * 100
+        # cls kept for data-status only (drives the popover's no-
+        # incident-data fallback icon/label) -- the VISIBLE color is
+        # the same continuous severity gradient uptime.html's calendar
+        # uses (_severity_color, defined further down but resolved at
+        # call time same as any Python name), applied here too so a
+        # 5-minute blip and a 4-hour outage don't render as the exact
+        # same flat red on the main page either.
         cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
+        color = _severity_color(pct)
         incidents = _clip_incidents_to_day(host, d)
         import html as _html
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
@@ -526,7 +609,7 @@ def day_bar_html(host):
         # that's still in progress.
         is_today = "1" if d == day_labels[-1] else "0"
         bars.append(
-            f'<div class="bar {cls}" data-date="{d}" data-status="{cls}" '
+            f'<div class="bar" style="background:{color}" data-date="{d}" data-status="{cls}" '
             f'data-pct="{pct:.0f}" data-today="{is_today}" data-incidents="{incidents_attr}"></div>')
     return "".join(bars)
 
@@ -1276,39 +1359,6 @@ import calendar as _calendar_mod
 import html as _html_mod
 
 _today_str_cal = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
-
-
-# 2026-08-22: status.claude.com's own calendar uses a continuous
-# green->yellow->orange->red gradient keyed to that day's real uptime %,
-# not a fixed 3-bucket scheme -- confirmed live against the reference
-# (a 4-hour outage day and a 5-minute blip both used to render as the
-# exact same flat red here, losing the severity signal a color gradient
-# is supposed to carry). Piecewise-linear interpolation between a few
-# named stops, closely matching the reference's own observed hues
-# (100% green #76ad2a through 0% red #e04343).
-_SEVERITY_STOPS = [
-    (100.0, (0x76, 0xad, 0x2a)),
-    (99.5,  (0x9a, 0xb4, 0x2a)),
-    (97.0,  (0xd9, 0xa9, 0x2a)),
-    (90.0,  (0xe6, 0xa8, 0x2a)),
-    (75.0,  (0xe8, 0x61, 0x36)),
-    (0.0,   (0xe0, 0x43, 0x43)),
-]
-
-
-def _severity_color(pct):
-    pct = max(0.0, min(100.0, pct))
-    for (p1, c1), (p2, c2) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:]):
-        if pct >= p1:
-            return f"#{c1[0]:02x}{c1[1]:02x}{c1[2]:02x}"
-        if pct >= p2:
-            t = (p1 - pct) / (p1 - p2)
-            r = round(c1[0] + (c2[0] - c1[0]) * t)
-            g = round(c1[1] + (c2[1] - c1[1]) * t)
-            b = round(c1[2] + (c2[2] - c1[2]) * t)
-            return f"#{r:02x}{g:02x}{b:02x}"
-    last = _SEVERITY_STOPS[-1][1]
-    return f"#{last[0]:02x}{last[1]:02x}{last[2]:02x}"
 
 
 def _cal_day_cell(host, d):
