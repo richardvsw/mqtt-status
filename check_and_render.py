@@ -403,7 +403,7 @@ def day_bar_html(host):
         if down_n:
             incidents.append({"kind": "down", "label": "Down", "seconds": down_n / total * day_seconds})
         if auth_n:
-            incidents.append({"kind": "autherr", "label": "Auth Ditolak", "seconds": auth_n / total * day_seconds})
+            incidents.append({"kind": "autherr", "label": "Autentikasi Ditolak", "seconds": auth_n / total * day_seconds})
         import html as _html
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
         # is_today marks the one bar whose percentage is against
@@ -442,10 +442,10 @@ for host in BROKERS:
             parts.append(f'<span class="ping ping-lxc">{b["lxc_latency_ms"]}ms</span>')
         if b["actions_latency_ms"] is not None:
             parts.append(f'<span class="ping ping-ci">{b["actions_latency_ms"]}ms</span>')
-        status_label = "Operational · " + " · ".join(parts) if parts else "Operational"
+        status_label = "Aktif · " + " · ".join(parts) if parts else "Aktif"
     elif b["auth_error"]:
         dur = fmt_duration(now - b["current_auth_start"]) if b["current_auth_start"] else "?"
-        status_label, status_class = f"Auth Ditolak · {dur}", "autherr"
+        status_label, status_class = f"Autentikasi Ditolak · {dur}", "autherr"
         auth_hosts.append(host)
     else:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
@@ -476,7 +476,7 @@ else:
     if down_hosts:
         parts.append(f"{', '.join(down_hosts)} Down")
     if auth_hosts:
-        parts.append(f"{', '.join(auth_hosts)} Auth Ditolak")
+        parts.append(f"{', '.join(auth_hosts)} Autentikasi Ditolak")
     banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(parts)}", "!"
 
 updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
