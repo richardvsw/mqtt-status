@@ -67,6 +67,14 @@ jobs:
           fi
       - name: Commit and push if changed
         if: steps.guard.outputs.skip != 'true'
+        # 2026-08-22: GitHub-hosted runners default to UTC, while the
+        # LXC-side publisher's commits naturally carry WIB (its system
+        # clock is WIB) -- comparing the two in git log meant converting
+        # timezones by hand every time. TZ=Asia/Jakarta here makes BOTH
+        # the actual commit author/committer date AND the message text
+        # consistently WIB, matching the LXC side exactly.
+        env:
+          TZ: Asia/Jakarta
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -75,7 +83,7 @@ jobs:
             echo "no changes to publish"
             exit 0
           fi
-          git commit -m "Update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git commit -m "Update status $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
           # Retries here now only cover a genuine simultaneous collision
           # (both sides finishing within the same instant) -- the guard
           # step above already eliminates the much larger "any overlap

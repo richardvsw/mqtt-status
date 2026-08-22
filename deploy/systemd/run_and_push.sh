@@ -42,7 +42,7 @@ if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else
     git -c user.name="mqtt-status-lxc" -c user.email="lxc@rivbot.local" \
-        commit --quiet -m "Update status (LXC) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        commit --quiet -m "Update status (LXC) $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
     # This box is the primary publisher and Actions now defers to it, so
     # a real collision should be rare -- but not impossible right at the
     # boundary of Actions' own 5-min defer window. 2 retries is enough
