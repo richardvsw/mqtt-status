@@ -341,6 +341,25 @@ _SEVERITY_STOPS = [
 ]
 
 
+_ID_MONTHS_FULL = [
+    "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+]
+_ID_MONTHS_ABBR = [
+    "", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+]
+
+
+def _id_strftime_dmy(ts, tz):
+    # datetime.strftime's %b/%B are locale-dependent (usually English on
+    # this server) -- the page is otherwise all Indonesian, so spell
+    # out the Indonesian month name/abbreviation ourselves instead of
+    # depending on system locale.
+    dt = datetime.fromtimestamp(ts, tz)
+    return dt, _ID_MONTHS_ABBR[dt.month], _ID_MONTHS_FULL[dt.month]
+
+
 def _severity_color(pct):
     pct = max(0.0, min(100.0, pct))
     for (p1, c1), (p2, c2) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:]):
@@ -441,7 +460,8 @@ elif up_count == 0:
 else:
     banner_class, banner_text, banner_icon = "warn", f"Gangguan — {', '.join(down_svcs)} Down", "!"
 
-updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
+_upd_dt, _upd_abbr, _ = _id_strftime_dmy(now, WIB)
+updated_str = _upd_dt.strftime(f"%d {_upd_abbr} %Y, %H:%M:%S WIB")
 
 def _load_bot_events():
     """Every entry ntfy.notify() has ever logged (restarts, broker
@@ -471,6 +491,11 @@ def _load_bot_events():
     return events[:EVENT_LOG_MAX_ENTRIES]
 
 
+def _event_row_time(ts):
+    dt, abbr, _ = _id_strftime_dmy(ts, WIB)
+    return dt.strftime(f"%d {abbr}, %H:%M WIB")
+
+
 def _event_log_html():
     events = _load_bot_events()
     if IS_CI:
@@ -479,7 +504,7 @@ def _event_log_html():
         return '<p class="note">Belum ada kejadian tercatat.</p>'
     rows_html = "".join(
         f'''<div class="event-row">
-          <div class="event-time">{datetime.fromtimestamp(e["ts"], WIB).strftime("%d %b, %H:%M WIB")}</div>
+          <div class="event-time">{_event_row_time(e["ts"])}</div>
           <div class="event-body"><div class="event-title">{e.get("title", "")}</div><div class="event-msg">{e.get("message", "")}</div></div>
         </div>'''
         for e in events

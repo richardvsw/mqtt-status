@@ -639,6 +639,25 @@ _SEVERITY_STOPS = [
 ]
 
 
+_ID_MONTHS_FULL = [
+    "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+]
+_ID_MONTHS_ABBR = [
+    "", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+]
+
+
+def _id_strftime_dmy(ts, tz):
+    # datetime.strftime's %b/%B are locale-dependent (usually English on
+    # this server) -- the page is otherwise all Indonesian, so spell
+    # out the Indonesian month name/abbreviation ourselves instead of
+    # depending on system locale.
+    dt = datetime.fromtimestamp(ts, tz)
+    return dt, _ID_MONTHS_ABBR[dt.month], _ID_MONTHS_FULL[dt.month]
+
+
 def _severity_color(pct):
     pct = max(0.0, min(100.0, pct))
     for (p1, c1), (p2, c2) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:]):
@@ -824,7 +843,8 @@ else:
         parts.append(f"{', '.join(auth_hosts)} Autentikasi Ditolak")
     banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(parts)}", "!"
 
-updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
+_upd_dt, _upd_abbr, _ = _id_strftime_dmy(now, WIB)
+updated_str = _upd_dt.strftime(f"%d {_upd_abbr} %Y, %H:%M:%S WIB")
 # notice.json mirrors brokers.json's own convention -- edit the JSON,
 # no code change needed, re-read fresh every run. Missing file or a
 # blank/absent "text" both mean no banner, so removing the notice
@@ -1552,7 +1572,7 @@ def _month_block_html(host, year, month):
     cells_html = "".join(cell_parts)
     pct = _month_uptime_pct(host, year, month)
     pct_label = f"{pct:.2f}%" if pct is not None else "-"
-    month_name = _calendar_mod.month_name[month]
+    month_name = _ID_MONTHS_FULL[month]
     return (
         f'\n      <div class="cal-month" data-ym="{year:04d}-{month:02d}" data-label="{month_name} {year}">\n'
         f'        <div class="cal-month-head"><span>{month_name} {year}</span><span class="cal-month-pct">{pct_label}</span></div>\n'
@@ -1570,7 +1590,8 @@ def _broker_section_html(host, is_first):
     return f'<div class="cal-broker" data-host="{host}" style="{display}">{blocks}</div>'
 
 
-uptime_updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
+_upd_dt2, _upd_abbr2, _ = _id_strftime_dmy(now, WIB)
+uptime_updated_str = _upd_dt2.strftime(f"%d {_upd_abbr2} %Y, %H:%M:%S WIB")
 _UPTIME_HOSTS = BROKERS + [BOT_COMBINED_KEY]
 _UPTIME_LABELS = {h: h for h in BROKERS}
 _UPTIME_LABELS[BOT_COMBINED_KEY] = BOT_COMBINED_LABEL
