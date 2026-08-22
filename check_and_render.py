@@ -92,14 +92,6 @@ OUT_PATH = "index.html"
 # display-window change, not a data-loss one for anything within 30 days.
 HISTORY_DAYS = 30
 
-# 2026-08-22: meshnode.id's maintainer announced (Discord) they're
-# adding a broker and migrating servers -- explains the down/auth-error
-# flapping several brokers are showing today that isn't anything on our
-# monitoring side. Empty string hides the banner entirely; clear this
-# once the migration settles rather than leaving a stale notice up.
-MAINTENANCE_NOTICE = "Meshnode.id lagi proses migrasi server — beberapa broker bisa gangguan sementara."
-
-
 CHECK_RETRIES = 10
 RETRY_DELAY_SECONDS = 1.5
 
@@ -659,12 +651,17 @@ else:
     banner_class, banner_text, banner_icon = "warn", f"Gangguan Sebagian — {', '.join(parts)}", "!"
 
 updated_str = datetime.fromtimestamp(now, WIB).strftime("%d %b %Y, %H:%M:%S WIB")
-# Built OUTSIDE the big html f-string below, not inlined as a nested
-# conditional expression there -- a nested triple-quoted string would
-# prematurely close the outer f'''...''' literal.
+# notice.json mirrors brokers.json's own convention -- edit the JSON,
+# no code change needed, re-read fresh every run. Missing file or a
+# blank/absent "text" both mean no banner, so removing the notice
+# once meshnode.id's migration settles is a one-line JSON edit, not a
+# code change. Built OUTSIDE the big html f-string below, not inlined
+# as a nested conditional expression there -- a nested triple-quoted
+# string would prematurely close the outer f'''...''' literal.
+notice_text = load_json("notice.json", {}).get("text", "").strip()
 maintenance_banner_html = (
-    f'<div class="banner info"><span class="banner-icon">\u2139</span>{MAINTENANCE_NOTICE}</div>'
-    if MAINTENANCE_NOTICE else ""
+    f'<div class="banner info"><span class="banner-icon">\u2139</span>{notice_text}</div>'
+    if notice_text else ""
 )
 commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
 
