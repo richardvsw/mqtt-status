@@ -371,6 +371,107 @@ def _fmt_clock_duration(seconds):
     return f"{hours} jam {rem_minutes} menit"
 
 
+def _build_real_incidents():
+    """Reconstructs REAL per-incident start/end epoch timestamps per host
+    by replaying log.jsonl's append-only per-check history -- a much
+    better source than history.json's aggregate day counts, which can
+    only give a proportional-elapsed-time ESTIMATE of duration, not real
+    clock times. Every log.jsonl line already carries current_outage_start
+    (every entry) / current_auth_start (entries since the 2026-08-22
+    tri-state fix) -- the confirmed start timestamp of whatever incident
+    was active at that check, persisted unchanged across checks until it
+    clears. Watching each field flip null -> timestamp -> null across the
+    log gives exact incident boundaries.
+
+    Adjacent same-kind incidents separated by a short gap get merged --
+    confirmed via a live run: the CONFIRM_THRESHOLD debounce (and having
+    two independent writers, the LXC timer and GitHub Actions, racing
+    commits) can momentarily reset current_*_start even mid-outage,
+    fragmenting one real incident into several 1-9 minute ones. A gap
+    under 10 minutes is treated as the same incident continuing, not a
+    real recovery-then-fail.
+    """
+    MERGE_GAP_SECONDS = 600
+    incidents = {}
+    open_incident = {}
+    try:
+        with open(LOG_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts = rec.get("ts")
+                for host, b in rec.get("brokers", {}).items():
+                    incidents.setdefault(host, [])
+                    for kind, field in (("down", "current_outage_start"), ("autherr", "current_auth_start")):
+                        val = b.get(field)
+                        key = (host, kind)
+                        if val:
+                            if key not in open_incident:
+                                open_incident[key] = val
+                        elif key in open_incident:
+                            start = open_incident.pop(key)
+                            lst = incidents[host]
+                            if lst and lst[-1]["kind"] == kind and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
+                                lst[-1]["end"] = ts
+                            else:
+                                lst.append({"kind": kind, "start": start, "end": ts})
+    except FileNotFoundError:
+        pass
+    for (host, kind), start in open_incident.items():
+        lst = incidents.setdefault(host, [])
+        if lst and lst[-1]["kind"] == kind and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
+            lst[-1]["end"] = None
+        else:
+            lst.append({"kind": kind, "start": start, "end": None})
+    return incidents
+
+
+REAL_INCIDENTS = _build_real_incidents()
+KIND_LABEL = {"down": "Down", "autherr": "Autentikasi Ditolak"}
+
+
+def _clip_incidents_to_day(host, d):
+    """Real incidents clipped to day `d`'s [00:00, 24:00) WIB window,
+    each carrying real clock start/end (or day boundaries for whatever
+    portion of a multi-day incident falls on this particular day)."""
+    day_start = datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=WIB).timestamp()
+    day_end = day_start + 86400
+    out = []
+    for inc in REAL_INCIDENTS.get(host, []):
+        seg_start = max(inc["start"], day_start)
+        seg_end_raw = inc["end"] if inc["end"] is not None else now
+        seg_end = min(seg_end_raw, day_end)
+        if seg_end <= seg_start:
+            continue
+        # An incident that continues past this day's boundary clips to
+        # exactly midnight-of-the-NEXT-day -- strftime on that instant
+        # reads "00:00", which looks like it ended at the START of this
+        # day, not that it was still running at the end of it. "24:00" is
+        # the correct end-of-day reading; confirmed live against the real
+        # 2026-08-15 outage (19:09 -> continues into the 16th), which
+        # rendered as "19:09-00:00" before this fix -- looked like a
+        # 9-hour gap-then-restart instead of one continuous outage.
+        if inc["end"] is None and seg_end_raw <= day_end:
+            end_clock = "sekarang"
+        elif seg_end >= day_end:
+            end_clock = "24:00"
+        else:
+            end_clock = datetime.fromtimestamp(seg_end, WIB).strftime("%H:%M")
+        out.append({
+            "kind": inc["kind"],
+            "label": KIND_LABEL[inc["kind"]],
+            "seconds": seg_end - seg_start,
+            "start_clock": datetime.fromtimestamp(seg_start, WIB).strftime("%H:%M"),
+            "end_clock": end_clock,
+        })
+    return out
+
+
 def day_bar_html(host):
     bars = []
     for d in day_labels:
@@ -381,29 +482,7 @@ def day_bar_html(host):
         total = slot["total"]
         pct = slot["up"] / total * 100
         cls = "up" if pct >= 99.5 else ("warn" if pct >= 90 else "down")
-        # down/auth_error breakdown only exists for days recorded since
-        # 2026-08-22 -- older days silently omit it (data-incidents stays
-        # empty) rather than showing a misleading "0" duration that was
-        # never actually measured; the popover falls back to just the
-        # uptime % for those.
-        down_n = slot.get("down", 0)
-        auth_n = slot.get("auth_error", 0)
-        # Each slot's own check count is the only record of how much of
-        # the day it actually covers (a partial/just-started day has
-        # fewer checks than a full one) -- duration is that check's
-        # share of total checks, scaled against the real elapsed portion
-        # of the 24h day using DAY_SECONDS / total as the per-check
-        # "weight". This is an approximation (check cadence isn't
-        # perfectly even between the LXC's 2-min timer and Actions' 10-min
-        # fallback) but it's the closest available without storing a
-        # timestamp on every single check.
-        day_seconds = 86400 if d != day_labels[-1] else max(1, (now - datetime.combine(
-            datetime.fromtimestamp(now, WIB).date(), datetime.min.time(), WIB).timestamp()))
-        incidents = []
-        if down_n:
-            incidents.append({"kind": "down", "label": "Down", "seconds": down_n / total * day_seconds})
-        if auth_n:
-            incidents.append({"kind": "autherr", "label": "Autentikasi Ditolak", "seconds": auth_n / total * day_seconds})
+        incidents = _clip_incidents_to_day(host, d)
         import html as _html
         incidents_attr = _html.escape(json.dumps(incidents), quote=True)
         # is_today marks the one bar whose percentage is against
@@ -638,8 +717,12 @@ html = f'''<!doctype html>
   .daypop-row.autherr {{ background: var(--warn-bg); color: var(--warn); }}
   .daypop-row.ok {{ background: var(--ok-bg); color: var(--ok); }}
   .daypop-row-icon {{ flex-shrink: 0; }}
-  .daypop-row-label {{ flex: 1; font-weight: 600; }}
-  .daypop-row-dur {{ font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }}
+  .daypop-row-main {{ flex: 1; min-width: 0; }}
+  .daypop-row-label {{ font-weight: 600; }}
+  .daypop-row-time {{
+    font-variant-numeric: tabular-nums; font-size: .74rem; opacity: .8; margin-top: .1rem;
+  }}
+  .daypop-row-dur {{ font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; flex-shrink: 0; }}
   .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 
   .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
@@ -699,7 +782,7 @@ html = f'''<!doctype html>
       activeBar = null;
     }}
 
-    function rowHtml(kind, label, seconds) {{
+    function rowHtml(kind, label, seconds, startClock, endClock) {{
       var icon = kind === "down" ? "\u2715" : (kind === "autherr" ? "\u26A0" : "\u2713");
       var mins = Math.round(seconds / 60);
       var dur;
@@ -709,8 +792,11 @@ html = f'''<!doctype html>
         var h = Math.floor(mins / 60), m = mins % 60;
         dur = m === 0 ? (h + " jam") : (h + " jam " + m + " menit");
       }}
+      var timeRange = (startClock && endClock)
+        ? '<div class="daypop-row-time">' + startClock + '\u2013' + endClock + ' WIB</div>' : '';
       return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
-             '</span><span class="daypop-row-label">' + label + '</span><span class="daypop-row-dur">' + dur + '</span></div>';
+             '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
+             '</div><span class="daypop-row-dur">' + dur + '</span></div>';
     }}
 
     document.querySelectorAll(".bar").forEach(function (bar) {{
@@ -738,7 +824,7 @@ html = f'''<!doctype html>
                  '<span class="daypop-row-label">' + okLabel + '</span></div>';
         }} else {{
           incidents.forEach(function (inc) {{
-            body += rowHtml(inc.kind, inc.label, inc.seconds);
+            body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
           }});
         }}
         if (bar.dataset.pct) {{
