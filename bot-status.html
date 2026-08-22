@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="id">
+<script>
+(function () {
+  try {
+    if (localStorage.getItem("mqtt-status-theme") === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  } catch (e) {}
+})();
+</script>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status Bot — RiV-meshBot</title>
+<meta name="description" content="Status langsung layanan RiV-meshBot (mesh_bot, meshtasticd)">
+<script>
+  setTimeout(function () {
+    location.replace(location.pathname + "?_=" + Date.now());
+  }, 60000);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
+    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
+    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
+    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
+    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
+    --accent: #066fd1;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  html[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="light"] {
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
+    --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
+    --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
+    --accent: #066fd1;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
+  }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .banner {
+    display: flex; align-items: center; justify-content: center; gap: .55rem;
+    padding: .85rem 1.2rem; text-align: center; font-size: .92rem; font-weight: 600;
+    letter-spacing: .1px; border-bottom: 1px solid var(--border-soft);
+  }
+  .banner-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; font-size: .7rem; flex-shrink: 0;
+  }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+  .banner.ok .banner-icon { background: var(--ok); color: #05130d; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .banner.warn .banner-icon { background: var(--warn); color: #241c0d; }
+  .banner.crit { background: var(--crit-bg); color: var(--crit); }
+  .banner.crit .banner-icon { background: var(--crit); color: #250f0d; }
+
+  .wrap { max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }
+  .titlebar { display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }
+  .titlebar h1 { flex: 1; font-size: 1.2rem; font-weight: 650; margin: 0; letter-spacing: -.2px; }
+  .live-clock {
+    font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .back { color: var(--accent); text-decoration: none; font-size: .85rem; }
+  .back:hover { text-decoration: underline; }
+  .sub { color: var(--muted); font-size: .86rem; margin: .6rem 0 1.8rem; }
+  .sub b { color: var(--text); font-weight: 600; }
+
+  .panel { background: var(--surf); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }
+  .row { padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft); font-size: .92rem; }
+  .row:first-child { border-top: none; border-top-left-radius: 14px; border-top-right-radius: 14px; }
+  .row:last-child { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+  .row-top { display: flex; justify-content: space-between; align-items: center; gap: .8rem; margin-bottom: .3rem; }
+  .row-left { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+  .row-extra { color: var(--faint); font-size: .76rem; margin-bottom: .25rem; }
+  .dot { position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.up { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-dim); }
+  .dot.down { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }
+  .host { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88rem; }
+  .status { font-weight: 600; font-variant-numeric: tabular-nums; font-size: .84rem; flex-shrink: 0; }
+  .status.up { color: var(--ok); }
+  .status.down { color: var(--crit); }
+
+  .bars { display: flex; gap: 3px; height: 34px; margin-top: .6rem; }
+  .bar { flex: 1 1 0; min-width: 0; position: relative; cursor: pointer; }
+  .bar:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+  .bar:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+  .bar.nodata { background: var(--border); }
+  .bar:hover, .bar.active { opacity: 1; transform: scaleY(1.06); }
+
+  .daypop {
+    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
+    transform: translateY(4px); transition: opacity .12s, transform .12s;
+    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
+  }
+  .daypop.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .daypop-arrow {
+    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
+    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+    opacity: 0; pointer-events: none; transition: opacity .12s;
+  }
+  .daypop-arrow.open { opacity: 1; }
+  .daypop-arrow.arrow-up { transform: rotate(45deg); }
+  .daypop-arrow.arrow-down { transform: rotate(225deg); }
+  .daypop-head {
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surf2); z-index: 1;
+    padding: .9rem 1rem .55rem; border-bottom: 1px solid var(--border-soft);
+  }
+  #daypop-body { padding: .6rem 1rem 1rem; }
+  .daypop-date { font-weight: 650; font-size: .9rem; }
+  .daypop-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: .15rem; border-radius: 5px; }
+  .daypop-close:hover { color: var(--text); background: var(--border-soft); }
+  .daypop-row { display: flex; align-items: center; gap: .5rem; padding: .5rem .6rem; border-radius: 8px; font-size: .82rem; margin-bottom: .4rem; }
+  .daypop-row:last-child { margin-bottom: 0; }
+  .daypop-row.down { background: var(--crit-bg); color: var(--crit); }
+  .daypop-row.ok { background: var(--ok-bg); color: var(--ok); }
+  .daypop-row-icon { flex-shrink: 0; }
+  .daypop-row-main { flex: 1; min-width: 0; }
+  .daypop-row-label { font-weight: 600; }
+  .daypop-row-time { font-variant-numeric: tabular-nums; font-size: .74rem; opacity: .8; margin-top: .1rem; }
+  .daypop-row-dur { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; flex-shrink: 0; }
+  .daypop-pct { color: var(--faint); font-size: .74rem; margin-top: .5rem; }
+
+  .bars-caption { display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; }
+  .row-caption { margin-top: .5rem; font-size: .68rem; gap: .5rem; }
+  .caption-line { flex: 1; height: 1px; background: var(--border); min-width: 1.2rem; }
+  .note { color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }
+  footer { color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }
+  footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }
+  footer a:hover { color: var(--text); border-color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="banner ok"><span class="banner-icon">✓</span>Semua Layanan Bot Normal</div>
+  <div class="wrap">
+    <a class="back" href="index.html">← Status broker MQTT</a>
+    <div class="titlebar">
+      <h1>Status Bot — RiV-meshBot</h1>
+      <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
+    </div>
+    <div class="sub"><b>3/3</b> layanan normal — data diperbarui tiap 2 menit (LXC) / dicek tiap ~10 menit (GitHub Actions, hanya memantau apakah LXC masih hidup)</div>
+    <div class="panel">
+        <div class="row">
+          <div class="row-top">
+            <div class="row-left"><span class="dot up"></span><span class="host">mesh_bot.service</span></div>
+            <div class="status up">Aktif</div>
+          </div>
+          <div class="row-extra">Balasan terakhir: 13m lalu</div><div class="row-extra">Restart tercatat: 0x</div>
+          <div class="bars"><div class="bar nodata" data-date="2026-07-24" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-25" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-26" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-27" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-28" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-29" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-30" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-31" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-01" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-02" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-03" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-04" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-05" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-06" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-07" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-08" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-09" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-10" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-22" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
+          <div class="bars-caption row-caption">
+            <span>30 hari lalu</span>
+            <span class="caption-line"></span>
+            <span>100.00 % uptime</span>
+            <span class="caption-line"></span>
+            <span>Hari ini</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-top">
+            <div class="row-left"><span class="dot up"></span><span class="host">meshtasticd.service</span></div>
+            <div class="status up">Aktif</div>
+          </div>
+          
+          <div class="bars"><div class="bar nodata" data-date="2026-07-24" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-25" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-26" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-27" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-28" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-29" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-30" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-31" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-01" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-02" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-03" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-04" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-05" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-06" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-07" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-08" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-09" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-10" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-22" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
+          <div class="bars-caption row-caption">
+            <span>30 hari lalu</span>
+            <span class="caption-line"></span>
+            <span>100.00 % uptime</span>
+            <span class="caption-line"></span>
+            <span>Hari ini</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-top">
+            <div class="row-left"><span class="dot up"></span><span class="host">LXC Monitor</span></div>
+            <div class="status up">Aktif</div>
+          </div>
+          
+          <div class="bars"><div class="bar nodata" data-date="2026-07-24" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-25" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-26" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-27" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-28" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-29" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-30" data-status="nodata"></div><div class="bar nodata" data-date="2026-07-31" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-01" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-02" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-03" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-04" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-05" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-06" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-07" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-08" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-09" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-10" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-22" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
+          <div class="bars-caption row-caption">
+            <span>30 hari lalu</span>
+            <span class="caption-line"></span>
+            <span>100.00 % uptime</span>
+            <span class="caption-line"></span>
+            <span>Hari ini</span>
+          </div>
+        </div></div>
+    <p class="note">"LXC Monitor" bukan layanan bot itu sendiri -- ini menunjukkan apakah box yang menjalankan pengecekan mesh_bot/meshtasticd masih hidup. GitHub Actions tidak bisa memeriksa mesh_bot/meshtasticd secara langsung (layanan privat di jaringan rumah), jadi baris itu hanya bisa dikonfirmasi dari LXC sendiri -- kalau LXC down, baris ini yang akan menunjukkan berapa lama.</p>
+    <footer>Diperbarui 22 Aug 2026, 21:54:52 WIB · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
+  </div>
+  <div class="daypop" id="daypop">
+    <div class="daypop-head">
+      <span class="daypop-date" id="daypop-date"></span>
+      <button class="daypop-close" id="daypop-close" aria-label="Tutup">✕</button>
+    </div>
+    <div id="daypop-body"></div>
+  </div>
+  <div class="daypop-arrow" id="daypop-arrow"></div>
+  <script>
+    var pop = document.getElementById("daypop");
+    var popDate = document.getElementById("daypop-date");
+    var popBody = document.getElementById("daypop-body");
+    var popClose = document.getElementById("daypop-close");
+    var popArrow = document.getElementById("daypop-arrow");
+    var activeBar = null;
+
+    function closePop() {
+      pop.classList.remove("open");
+      popArrow.classList.remove("open");
+      if (activeBar) activeBar.classList.remove("active");
+      activeBar = null;
+    }
+
+    function rowHtml(kind, label, seconds, startClock, endClock) {
+      var icon = kind === "down" ? "✕" : "✓";
+      var mins = Math.round(seconds / 60);
+      var dur;
+      if (mins < 60) { dur = mins + " menit"; }
+      else { var h = Math.floor(mins / 60), m = mins % 60; dur = m === 0 ? (h + " jam") : (h + " jam " + m + " menit"); }
+      var timeRange = (startClock && endClock)
+        ? '<div class="daypop-row-time">' + startClock + '–' + endClock + ' WIB</div>' : '';
+      return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
+             '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
+             '</div><span class="daypop-row-dur">' + dur + '</span></div>';
+    }
+
+    function positionPopover(bar) {
+      var r = bar.getBoundingClientRect();
+      pop.classList.remove("arrow-up", "arrow-down");
+      var popWidth = pop.offsetWidth || 300;
+      var vvw = window.visualViewport;
+      var viewW = vvw ? vvw.width : window.innerWidth;
+      var viewH = vvw ? vvw.height : window.innerHeight;
+      var margin = 8;
+      var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, margin), viewW - popWidth - margin);
+      var arrowX = r.left + r.width / 2 - left;
+      arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
+      var spaceAbove = r.top;
+      var vMargin = 8;
+      pop.style.transform = "translateY(0)";
+      if (spaceAbove > 220) {
+        pop.style.top = vMargin + "px";
+        pop.style.bottom = (viewH - r.top + 12) + "px";
+        pop.classList.add("arrow-down");
+      } else {
+        pop.style.top = (r.bottom + 12) + "px";
+        pop.style.bottom = vMargin + "px";
+        pop.classList.add("arrow-up");
+      }
+      pop.style.left = left + "px";
+      pop.classList.add("open");
+      var popRect = pop.getBoundingClientRect();
+      popArrow.classList.remove("arrow-up", "arrow-down");
+      if (pop.classList.contains("arrow-up")) {
+        popArrow.style.top = (popRect.top - 5) + "px";
+        popArrow.classList.add("arrow-up");
+      } else {
+        popArrow.style.top = (popRect.bottom - 5) + "px";
+        popArrow.classList.add("arrow-down");
+      }
+      popArrow.style.left = (popRect.left + arrowX - 5) + "px";
+      popArrow.classList.add("open");
+    }
+
+    document.querySelectorAll(".bar").forEach(function (bar) {
+      bar.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var wasActive = bar.classList.contains("active");
+        document.querySelectorAll(".bar.active").forEach(function (b) { b.classList.remove("active"); });
+        if (wasActive) { closePop(); return; }
+        var status = bar.dataset.status;
+        if (status === "nodata") return;
+        bar.classList.add("active");
+        activeBar = bar;
+        popDate.textContent = bar.dataset.date;
+        var incidents = [];
+        try { incidents = JSON.parse(bar.dataset.incidents || "[]"); } catch (err) { incidents = []; }
+        var body = "";
+        if (incidents.length === 0) {
+          var ok = status === "up";
+          body = '<div class="daypop-row ' + (ok ? "ok" : "down") + '"><span class="daypop-row-icon">' + (ok ? "✓" : "✕") + '</span>' +
+                 '<span class="daypop-row-label">' + (ok ? "Beroperasi Normal" : "Tidak ada rincian tersedia") + '</span></div>';
+        } else {
+          incidents.forEach(function (inc) { body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); });
+        }
+        if (bar.dataset.pct) {
+          var pctLabel = bar.dataset.today === "1"
+            ? 'Aktif ' + bar.dataset.pct + '% dari waktu berjalan hari ini'
+            : 'Aktif ' + bar.dataset.pct + '%';
+          body += '<div class="daypop-pct">' + pctLabel + '</div>';
+        }
+        popBody.innerHTML = body;
+        positionPopover(bar);
+      });
+    });
+
+    function repositionIfOpen() { if (activeBar && pop.classList.contains("open")) positionPopover(activeBar); }
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(repositionIfOpen); }
+    window.addEventListener("resize", repositionIfOpen, { passive: true });
+    if (window.visualViewport) { window.visualViewport.addEventListener("resize", repositionIfOpen, { passive: true }); }
+    popClose.addEventListener("click", function (e) { e.stopPropagation(); closePop(); });
+    document.addEventListener("click", function (e) { if (pop.classList.contains("open") && !pop.contains(e.target)) closePop(); });
+    window.addEventListener("scroll", closePop, { passive: true });
+
+    var liveClock = document.getElementById("live-clock");
+    function tickClock() {
+      var wib = new Date(Date.now() + 7 * 3600 * 1000);
+      var hh = String(wib.getUTCHours()).padStart(2, "0");
+      var mm = String(wib.getUTCMinutes()).padStart(2, "0");
+      var ss = String(wib.getUTCSeconds()).padStart(2, "0");
+      liveClock.textContent = hh + ":" + mm + ":" + ss + " WIB";
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
+  </script>
+</body>
+</html>

@@ -54,7 +54,13 @@ export BOT_LONG_NAME
 
 python3 check_and_render.py
 
-git add index.html history state.json log.jsonl brokers.json notice.json
+# 2026-08-22: bot-status.html (mesh_bot/meshtasticd service uptime) --
+# only THIS side can actually check them (local systemd + local API,
+# neither reachable from GitHub Actions). See check_bot_status.py's own
+# docstring for the full LXC-vs-Actions split.
+python3 check_bot_status.py
+
+git add index.html history state.json log.jsonl brokers.json notice.json \n    bot-status.html bot_history bot_state.json bot_log.jsonl
 if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else

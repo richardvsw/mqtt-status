@@ -1068,7 +1068,7 @@ html = f'''<!doctype html>
       </button>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif — data diperbarui tiap 10 menit</div>
-    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a></div>
+    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
       <span>{HISTORY_DAYS} hari lalu</span>

@@ -39,6 +39,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      # 2026-08-22: can't check mesh_bot/meshtasticd themselves from here
+      # (private services on a home LXC, no network path in) -- this
+      # script self-detects IS_CI and only evaluates whether the LXC's
+      # OWN last check has gone stale, recording that as its own
+      # "lxc-monitor" outage. See check_bot_status.py's docstring.
+      - run: python3 check_bot_status.py
       - name: Skip publish if the LXC already did recently
         id: guard
         run: |
@@ -78,7 +84,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html history.json state.json log.jsonl brokers.json
+          # 2026-08-22: history.json/notice.json were both stale here --
+          # history.json was split into history/YYYY-MM.json a while back
+          # and notice.json was added, but this list was never updated to
+          # match, so a fallback run would have silently failed to commit
+          # either. bot-status.html/bot_history/bot_state.json/
+          # bot_log.jsonl added alongside check_bot_status.py above.
+          git add index.html history state.json log.jsonl brokers.json notice.json \n            bot-status.html bot_history bot_state.json bot_log.jsonl
           if git diff --cached --quiet; then
             echo "no changes to publish"
             exit 0
