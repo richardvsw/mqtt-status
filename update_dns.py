@@ -52,16 +52,18 @@ def _cf_request(method, path, body=None):
 
 
 def pick_best_broker(brokers, state):
-    """Prefers the CURRENTLY-pointed broker if it's still healthy (avoids
-    unnecessary reconnect churn on every run for no real reason), else the
-    first healthy one in brokers.json's own priority order."""
-    current = get_current_target()
+    """Always prefers brokers.json's FIRST entry (mqtt.meshnode.id) when
+    it's healthy -- the primary broker, not just "whatever we happen to
+    be on already". Only falls through to the next healthy one in
+    brokers.json's own priority order while the primary is down/auth-
+    rejected, and reverts back to it automatically the moment it
+    recovers (this function is re-evaluated fresh every run, so recovery
+    just falls out of the same ordered scan rather than needing separate
+    revert logic)."""
     healthy = [h for h in brokers if not state.get(h, {}).get("current_outage_start")
                and not state.get(h, {}).get("current_auth_start")]
     if not healthy:
         return None  # every broker confirmed down/auth-rejected -- leave DNS as-is rather than pointing at a known-bad host
-    if current in healthy:
-        return current
     return healthy[0]
 
 
