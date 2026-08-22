@@ -1399,7 +1399,12 @@ uptime_html = f"""<!doctype html>
   .cal-nav button:not(:disabled):hover {{ background: var(--surf2); }}
   .cal-range {{ font-size: .85rem; color: var(--muted); font-weight: 600; }}
   .cal-months {{ display: flex; flex-wrap: wrap; gap: 1.4rem; }}
-  .cal-month {{ width: min(220px, 100%); }}
+  /* 2026-08-22: was min(220px, 100%), left over from the old design
+     where multiple brokers' month blocks sat side-by-side in a
+     wrapping row -- now only one broker/month shows at a time (see
+     the dropdown + 3-month-window rework), so capping width just
+     wasted most of the screen on mobile for no reason. */
+  .cal-month {{ width: 100%; max-width: 420px; margin: 0 auto; }}
   .cal-month-head {{
     display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
     color: var(--muted); margin-bottom: .4rem;
