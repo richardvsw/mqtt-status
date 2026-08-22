@@ -472,6 +472,24 @@ def _clip_incidents_to_day(host, d):
     return out
 
 
+def host_uptime_pct(host):
+    """Overall uptime % across the whole HISTORY_DAYS window for one
+    host -- same "99.22% uptime" figure status.claude.com shows under
+    each service's own bar strip. Summed from raw per-check counts
+    (not a simple average of daily percentages), so a day with more
+    checks recorded naturally carries more weight than a day with only
+    a handful -- matches how the bars themselves are colored."""
+    up_sum, total_sum = 0, 0
+    for d in day_labels:
+        slot = history.get(d, {}).get(host)
+        if slot:
+            up_sum += slot.get("up", 0)
+            total_sum += slot.get("total", 0)
+    if total_sum == 0:
+        return None
+    return up_sum / total_sum * 100
+
+
 def day_bar_html(host):
     bars = []
     for d in day_labels:
@@ -530,6 +548,8 @@ for host in BROKERS:
         dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
         status_label, status_class = f"Down · {dur}", "down"
         down_hosts.append(host)
+    uptime_pct = host_uptime_pct(host)
+    uptime_label = f"{uptime_pct:.2f} % uptime" if uptime_pct is not None else "belum ada data"
     rows.append(f'''
         <div class="row">
           <div class="row-top">
@@ -537,6 +557,13 @@ for host in BROKERS:
             <div class="status {status_class}">{status_label}</div>
           </div>
           <div class="bars">{day_bar_html(host)}</div>
+          <div class="bars-caption row-caption">
+            <span>{HISTORY_DAYS} hari lalu</span>
+            <span class="caption-line"></span>
+            <span>{uptime_label}</span>
+            <span class="caption-line"></span>
+            <span>Hari ini</span>
+          </div>
         </div>''')
 
 total = len(BROKERS)
@@ -757,6 +784,12 @@ html = f'''<!doctype html>
   .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 
   .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
+  /* Per-row variant (status.claude.com's own "30 days ago —— 99.22%
+     uptime —— Today" line, one under each service's bar strip) --
+     tighter than the page-level .bars-caption since there's now one of
+     these per broker, not just one at the very bottom. */
+  .row-caption {{ margin-top: .5rem; font-size: .68rem; gap: .5rem; }}
+  .caption-line {{ flex: 1; height: 1px; background: var(--border); min-width: 1.2rem; }}
   .legend {{ display: flex; align-items: center; gap: 1rem; }}
   .legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .legend i {{ width: 8px; height: 8px; border-radius: 2px; display: inline-block; }}
@@ -856,9 +889,23 @@ html = f'''<!doctype html>
 
         var body = "";
         if (incidents.length === 0) {{
-          var okLabel = status === "up" ? "Beroperasi Normal" : "Tidak ada rincian tersedia";
-          body = '<div class="daypop-row ok"><span class="daypop-row-icon">\u2713</span>' +
-                 '<span class="daypop-row-label">' + okLabel + '</span></div>';
+          // 2026-08-22: this branch used to hardcode the green "ok"
+          // style/checkmark regardless of the real status -- confirmed
+          // live on mqtt5.meshnode.id: its very first-ever check failed
+          // (0% up that day), but since REAL_INCIDENTS only records a
+          // CONFIRMED outage (2 consecutive fails) and this was only 1,
+          // there was no incident to show, and the fallback showed a
+          // green checkmark + "no details" as if it were healthy. The
+          // icon/color now matches bar.dataset.status (the same value
+          // that colors the bar itself), so a red/down day can't render
+          // a green "no details available" row.
+          var noDataStyle = {{
+            up:   {{ cls: "ok",      icon: "\u2713", label: "Beroperasi Normal" }},
+            down: {{ cls: "down",    icon: "\u2715", label: "Tidak ada rincian tersedia" }},
+            warn: {{ cls: "autherr", icon: "\u26a0", label: "Tidak ada rincian tersedia" }}
+          }}[status] || {{ cls: "down", icon: "\u2715", label: "Tidak ada rincian tersedia" }};
+          body = '<div class="daypop-row ' + noDataStyle.cls + '"><span class="daypop-row-icon">' + noDataStyle.icon + '</span>' +
+                 '<span class="daypop-row-label">' + noDataStyle.label + '</span></div>';
         }} else {{
           incidents.forEach(function (inc) {{
             body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
