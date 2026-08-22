@@ -590,6 +590,12 @@ incident_kind_icon = {"down": "✕", "autherr": "⚠"}
 
 
 def _incident_log_html():
+    # 2026-08-22: a genuinely bad day (today, mid-outage: 20+ rows across
+    # 6 flapping brokers) made the page extremely long -- native <details>/
+    # <summary> collapses each day to one line by default (no JS needed,
+    # keyboard-accessible for free), showing just a count + which brokers
+    # were affected. Clicking a day expands the full row list, same as
+    # before.
     if not incident_days:
         return '<p class="note">Tidak ada insiden tercatat dalam 30 hari terakhir.</p>'
     blocks = []
@@ -603,11 +609,17 @@ def _incident_log_html():
             </div>'''
             for e in entries
         )
+        n_hosts = len({e["host"] for e in entries})
+        summary_text = f"{len(entries)} insiden · {n_hosts} broker terdampak"
         blocks.append(f'''
-        <div class="incident-day">
-          <div class="incident-date">{d}</div>
-          {rows_html}
-        </div>''')
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">{d}</span>
+            <span class="incident-count">{summary_text}</span>
+          </summary>
+          <div class="incident-rows">{rows_html}</div>
+        </details>''')
     return "".join(blocks)
 
 
@@ -855,9 +867,19 @@ html = f'''<!doctype html>
     background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); overflow: hidden;
   }}
-  .incident-day {{ padding: .9rem 1.1rem; border-bottom: 1px solid var(--border-soft); }}
+  .incident-day {{ border-bottom: 1px solid var(--border-soft); }}
   .incident-day:last-child {{ border-bottom: none; }}
-  .incident-date {{ font-weight: 600; font-size: .82rem; margin-bottom: .55rem; }}
+  .incident-day[open] > .incident-summary .incident-chevron {{ transform: rotate(90deg); }}
+  .incident-summary {{
+    display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
+    cursor: pointer; list-style: none; user-select: none;
+  }}
+  .incident-summary::-webkit-details-marker {{ display: none; }}
+  .incident-summary:hover {{ background: var(--border-soft); }}
+  .incident-chevron {{ color: var(--faint); font-size: .7rem; transition: transform .12s; flex-shrink: 0; }}
+  .incident-date {{ font-weight: 600; font-size: .82rem; }}
+  .incident-count {{ color: var(--faint); font-size: .76rem; margin-left: auto; }}
+  .incident-rows {{ padding: 0 1.1rem 1rem; }}
   .incident-row {{
     display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
     padding: .3rem 0; flex-wrap: wrap;
