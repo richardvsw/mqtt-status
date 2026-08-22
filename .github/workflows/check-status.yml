@@ -23,6 +23,18 @@ jobs:
         env:
           MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
           MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
+      # 2026-08-22: points mqtt.rivi.my.id at whichever broker is
+      # currently healthy (see update_dns.py's own docstring for the
+      # full reasoning) -- deliberately only runs here, in GitHub
+      # Actions, never on the LXC-side timer. The whole point is that
+      # broker selection keeps working even if the homelab itself goes
+      # offline; a device's DNS lookup hits Cloudflare directly and
+      # never depends on anything we run at home. CLOUDFLARE_API_TOKEN
+      # is scoped to DNS-edit on this one zone only.
+      - run: python3 update_dns.py
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
