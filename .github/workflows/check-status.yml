@@ -42,7 +42,26 @@ jobs:
           git add index.html history.json state.json log.jsonl brokers.json
           if git diff --cached --quiet; then
             echo "no changes to publish"
-          else
-            git commit -m "Update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git push
+            exit 0
           fi
+          git commit -m "Update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # 2026-08-22: a bare `git push` here failed the whole job (and
+          # fired a failure-notification email) every time this run
+          # collided with the LXC-side timer's own commit+push, which
+          # happens often since that side runs every 2 min. The data
+          # this step publishes (index.html/history.json/state.json/
+          # log.jsonl/brokers.json) is always freshly regenerated THIS
+          # run, so on conflict our own version is the correct one to
+          # keep -- `-X ours` resolves every conflicting hunk in favor
+          # of what this run just computed, instead of needing a human
+          # to pick a side.
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push rejected (attempt $i), rebasing onto origin/main and retrying"
+            git fetch origin main
+            git rebase -X ours origin/main
+          done
+          echo "failed to push after 5 attempts"
+          exit 1
