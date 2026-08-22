@@ -35,7 +35,34 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      - name: Skip publish if the LXC already did recently
+        id: guard
+        run: |
+          # 2026-08-22: the LXC-side timer (deploy/systemd/run_and_push.sh)
+          # is the PRIMARY publisher, running every 2 min; this workflow is
+          # only meant to be a FALLBACK for when the homelab is offline --
+          # that intent was already documented in run_and_push.sh's own
+          # comments, but nothing actually enforced it, so this run used
+          # to blindly try to publish every ~10 min regardless of whether
+          # the LXC had just done the exact same thing seconds earlier.
+          # That's the real race: not "pushing collides", but "both sides
+          # decide to publish in the same window at all". Skipping here
+          # when a recent LXC commit exists fixes the race at its source
+          # instead of just retrying around it -- 5 min is comfortably
+          # more than double the LXC's own 2-min cadence, so a commit
+          # that recent means the LXC is clearly alive and current.
+          last_author=$(git log -1 --format='%an')
+          last_ts=$(git log -1 --format='%at')
+          now=$(date +%s)
+          age=$((now - last_ts))
+          if [ "$last_author" = "mqtt-status-lxc" ] && [ "$age" -lt 300 ]; then
+            echo "LXC published ${age}s ago -- skipping, it's already current"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Commit and push if changed
+        if: steps.guard.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -45,17 +72,16 @@ jobs:
             exit 0
           fi
           git commit -m "Update status $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          # 2026-08-22: a bare `git push` here failed the whole job (and
-          # fired a failure-notification email) every time this run
-          # collided with the LXC-side timer's own commit+push, which
-          # happens often since that side runs every 2 min. The data
-          # this step publishes (index.html/history.json/state.json/
-          # log.jsonl/brokers.json) is always freshly regenerated THIS
-          # run, so on conflict our own version is the correct one to
-          # keep -- `-X ours` resolves every conflicting hunk in favor
-          # of what this run just computed, instead of needing a human
-          # to pick a side.
-          for i in 1 2 3 4 5; do
+          # Retries here now only cover a genuine simultaneous collision
+          # (both sides finishing within the same instant) -- the guard
+          # step above already eliminates the much larger "any overlap
+          # in a 10-min window" case that used to make this fail
+          # regularly. 3 is enough margin for that narrow remaining edge
+          # case without burning CI time on a scenario that's rare by
+          # design now. `-X ours` keeps THIS run's freshly-computed data
+          # on conflict, since it's always more current than whatever the
+          # other side had.
+          for i in 1 2 3; do
             if git push; then
               exit 0
             fi
@@ -63,5 +89,5 @@ jobs:
             git fetch origin main
             git rebase -X ours origin/main
           done
-          echo "failed to push after 5 attempts"
+          echo "failed to push after 3 attempts"
           exit 1
