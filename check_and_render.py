@@ -805,8 +805,17 @@ html = f'''<!doctype html>
   .daypop {{
     position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: var(--shadow); padding: .9rem 1rem 1rem; opacity: 0; pointer-events: none;
+    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
     transform: translateY(4px); transition: opacity .12s, transform .12s;
+    /* 2026-08-22: a day with several incidents could grow taller than
+       the viewport -- confirmed live on a phone screen: the card's
+       TOP (date header + close button) scrolled off-screen with no way
+       to reach it, since position:fixed doesn't scroll with the page.
+       Capping height and scrolling internally instead fixes that;
+       padding moved off this element onto .daypop-head/#daypop-body
+       individually so the head can stay pinned while the body scrolls.
+    */
+    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
   }}
   .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
   .daypop::before {{
@@ -822,7 +831,12 @@ html = f'''<!doctype html>
   }}
   .daypop.arrow-up::before {{ top: -6px; }}
   .daypop.arrow-down::before {{ bottom: -6px; transform: translateX(-50%) rotate(225deg); }}
-  .daypop-head {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: .55rem; }}
+  .daypop-head {{
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surf2); z-index: 1;
+    padding: .9rem 1rem .55rem; border-bottom: 1px solid var(--border-soft);
+  }}
+  #daypop-body {{ padding: .6rem 1rem 1rem; }}
   .daypop-date {{ font-weight: 650; font-size: .9rem; }}
   .daypop-close {{
     background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem;
@@ -1044,17 +1058,28 @@ html = f'''<!doctype html>
         arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
         pop.style.setProperty("--arrow-x", arrowX + "px");
         var spaceAbove = r.top;
+        var vMargin = 8;
+        pop.style.transform = "translateY(0)";
         if (spaceAbove > 220) {{
-          pop.style.top = (r.top - 12) + "px";
-          pop.style.left = left + "px";
-          pop.style.transform = "translateY(-100%)";
+          // 2026-08-22: was `top: (r.top-12)px` + translateY(-100%) --
+          // fine for a short card, but a day with several incidents
+          // could render taller than the space actually available
+          // above the bar, pushing the card's TOP (including the date
+          // header and close button) above y=0 with no way to reach it
+          // (confirmed live). Setting both top AND bottom instead lets
+          // the browser compute the box's real height as whatever fits
+          // between them -- it can never push past the vMargin safety
+          // line at the top, and overflow-y:auto (see .daypop CSS)
+          // scrolls internally for anything that still doesn't fit.
+          pop.style.top = vMargin + "px";
+          pop.style.bottom = (window.innerHeight - r.top + 12) + "px";
           pop.classList.add("arrow-down");
         }} else {{
           pop.style.top = (r.bottom + 12) + "px";
-          pop.style.left = left + "px";
-          pop.style.transform = "translateY(0)";
+          pop.style.bottom = vMargin + "px";
           pop.classList.add("arrow-up");
         }}
+        pop.style.left = left + "px";
         pop.classList.add("open");
       }});
     }});
