@@ -569,15 +569,18 @@ html = f'''<!doctype html>
 <title>meshnode.id MQTT Status</title>
 <meta name="description" content="Status langsung broker MQTT publik meshnode.id">
 <meta http-equiv="refresh" content="60">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --bg: #0a0d12; --bg2: #0d1117; --surf: #10151d; --surf2: #151b25; --border: #212a37; --border-soft: #1a222d;
-    --text: #eaeef3; --muted: #8b96a5; --faint: #566173;
-    --ok: #3ddc97; --ok-dim: #2a4a3d; --ok-bg: #0f2019;
-    --warn: #e8b64a; --warn-dim: #4a3d1f; --warn-bg: #241c0d;
-    --crit: #f2685c; --crit-dim: #4a2521; --crit-bg: #251311;
-    --accent: #5b8cff;
-    --tooltip-bg: #1a2230;
+    --bg: #0c1220; --bg2: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
+    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
+    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
+    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
+    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
+    --accent: #066fd1;
+    --tooltip-bg: #232f42;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
   }}
   * {{ box-sizing: border-box; }}
@@ -587,7 +590,7 @@ html = f'''<!doctype html>
     background:
       radial-gradient(900px 420px at 50% -10%, rgba(91,140,255,.10), transparent 60%),
       linear-gradient(180deg, var(--bg2), var(--bg) 340px);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
   }}
   .banner {{
@@ -618,7 +621,7 @@ html = f'''<!doctype html>
      own top edge. .row handles its own corner rounding on first/last
      instead of relying on the parent to clip square corners into shape. */
   .panel {{
-    background: var(--surf); border: 1px solid var(--border); border-radius: 14px;
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow);
   }}
   .row {{
@@ -689,7 +692,7 @@ html = f'''<!doctype html>
      this is just the card's visual shell. */
   .daypop {{
     position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
-    background: var(--surf2); border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); padding: .9rem 1rem 1rem; opacity: 0; pointer-events: none;
     transform: translateY(4px); transition: opacity .12s, transform .12s;
   }}
