@@ -1107,7 +1107,7 @@ html = f'''<!doctype html>
       <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
     </div>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
-    <p class="note">🔀 <b>mqtt.rivi.my.id</b> — pakai ini di node kamu, otomatis pindah ke broker yang sehat kalau ada yang down (DNS failover).{f" Saat ini menunjuk ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
+    <p class="note">🔀 Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover).{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
