@@ -137,7 +137,6 @@ def _save_history(history):
 
 now = time.time()
 state = load_json(STATE_PATH, {})
-history = _load_history()
 meta = state.setdefault("_meta", {})
 
 checks = {}  # service -> "up" / "down", only services actually checked THIS run
@@ -198,23 +197,41 @@ for svc, status in checks.items():
 
 save_json(STATE_PATH, state)
 
-today_str = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
-today_bucket = history.setdefault(today_str, {})
-for svc, status in checks.items():
-    slot = today_bucket.setdefault(svc, {"up": 0, "total": 0, "down": 0})
-    slot["total"] += 1
-    if status == "up":
-        slot["up"] += 1
-    else:
-        slot["down"] += 1
-cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_RETENTION_DAYS)).strftime("%Y-%m-%d")
-for d in [d for d in history if d < cutoff_date]:
-    del history[d]
-_save_history(history)
-
 if checks:
     with open(LOG_PATH, "a") as f:
         f.write(json.dumps({"ts": now, "checks": checks}) + "\n")
+
+# 2026-08-23: recomputed fresh from bot_log.jsonl every run instead of
+# an incrementally-updated counter -- see this file's own module
+# docstring note above load_json/save_json for the full reasoning.
+# cutoff matches the same HISTORY_RETENTION_DAYS trim the old
+# increment-based version applied to the loaded dict.
+history = {}
+_cutoff_date = (datetime.fromtimestamp(now, WIB) - timedelta(days=HISTORY_RETENTION_DAYS)).strftime("%Y-%m-%d")
+try:
+    with open(LOG_PATH) as f:
+        for _line in f:
+            _line = _line.strip()
+            if not _line:
+                continue
+            try:
+                _rec = json.loads(_line)
+            except json.JSONDecodeError:
+                continue
+            _d = datetime.fromtimestamp(_rec["ts"], WIB).strftime("%Y-%m-%d")
+            if _d < _cutoff_date:
+                continue
+            _bucket = history.setdefault(_d, {})
+            for _svc, _status in _rec.get("checks", {}).items():
+                _slot = _bucket.setdefault(_svc, {"up": 0, "total": 0, "down": 0})
+                _slot["total"] += 1
+                if _status == "up":
+                    _slot["up"] += 1
+                else:
+                    _slot["down"] += 1
+except FileNotFoundError:
+    pass
+_save_history(history)
 
 day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strftime("%Y-%m-%d")
               for i in range(HISTORY_DAYS - 1, -1, -1)]

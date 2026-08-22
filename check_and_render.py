@@ -425,6 +425,9 @@ def _fmt_clock_duration(seconds):
     return f"{hours} jam {rem_minutes} menit"
 
 
+MIN_INCIDENT_SECONDS = 120  # shorter than this -> not a real tracked incident, just noise
+
+
 def _build_real_incidents():
     """Reconstructs REAL per-incident start/end epoch timestamps per host
     by replaying log.jsonl's append-only per-check history -- a much
@@ -482,6 +485,15 @@ def _build_real_incidents():
             lst[-1]["end"] = None
         else:
             lst.append({"kind": kind, "start": start, "end": None})
+    # 2026-08-23: drop anything under MIN_INCIDENT_SECONDS -- a blip
+    # that happened to straddle exactly CONFIRM_THRESHOLD checks isn't
+    # a meaningful incident on its own (raw single-check blips already
+    # get their own clearly-labeled "(sesaat)" popover entry instead).
+    for host in incidents:
+        incidents[host] = [
+            inc for inc in incidents[host]
+            if (inc["end"] if inc["end"] is not None else time.time()) - inc["start"] >= MIN_INCIDENT_SECONDS
+        ]
     return incidents
 
 
@@ -571,6 +583,11 @@ def _build_bot_incidents():
             lst[-1]["end"] = None
         else:
             lst.append({"start": start, "end": None})
+    for svc in incidents:
+        incidents[svc] = [
+            inc for inc in incidents[svc]
+            if (inc["end"] if inc["end"] is not None else time.time()) - inc["start"] >= MIN_INCIDENT_SECONDS
+        ]
     return incidents
 
 
