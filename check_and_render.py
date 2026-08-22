@@ -232,6 +232,14 @@ if IS_CI:
     if loc:
         meta["actions_location"] = loc
 
+# 2026-08-22: legend used to hardcode "RiV-meshBot" -- only the LXC run
+# can actually query meshtasticd (run_and_push.sh sets BOT_LONG_NAME),
+# so persist whatever it found into _meta and keep using that on every
+# run including GitHub Actions ones, same pattern as lxc_location.
+bot_long_name = os.environ.get("BOT_LONG_NAME", "").strip()
+if bot_long_name:
+    meta["lxc_bot_name"] = bot_long_name
+
 brokers = {}
 for host in BROKERS:
     raw_status, latency_ms = check_broker(host)  # "up" / "auth_error" / "down"
@@ -521,6 +529,7 @@ def day_bar_html(host):
 # repeated 5x on the page.
 lxc_city = (meta.get("lxc_location") or "").split(",")[0]
 actions_city = (meta.get("actions_location") or "").split(",")[0]
+bot_display_name = meta.get("lxc_bot_name") or "RiV-meshBot"
 
 rows = []
 up_count = 0
@@ -818,19 +827,26 @@ html = f'''<!doctype html>
     max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
   }}
   .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
-  .daypop::before {{
-    content: ""; position: absolute; width: 10px; height: 10px; background: var(--surf2);
+  /* 2026-08-22: the arrow used to be a ::before pseudo-element of
+     .daypop itself, positioned at top:-6px/bottom:-6px (i.e. just
+     outside the card's own box). That broke the moment .daypop grew
+     overflow-y:auto for the scrollable-popover fix -- overflow clips
+     ANY child positioned outside the element's box, pseudo-elements
+     included, so the arrow was invisible (or showed a stray clipped
+     sliver) any time the card was tall enough to scroll, confirmed
+     live via screenshot. Pulled out into its own always-fixed sibling
+     element so it's never inside .daypop's scrolling/clipping context
+     -- its position is computed in JS from the popover's actual
+     rendered edges (getBoundingClientRect), not a CSS offset relative
+     to a box that might clip it. */
+  .daypop-arrow {{
+    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
     border-left: 1px solid var(--border); border-top: 1px solid var(--border);
-    /* 2026-08-22: this had no horizontal position at all before --
-       it just sat at the pseudo-element's default (effectively the
-       card's left edge) regardless of which bar was actually clicked.
-       --arrow-x is set from JS to the real bar's center, clamped to
-       stay within the card itself even when the CARD had to shift to
-       avoid overflowing the viewport (see the click handler). */
-    left: var(--arrow-x, 20px); transform: translateX(-50%) rotate(45deg);
+    opacity: 0; pointer-events: none; transition: opacity .12s;
   }}
-  .daypop.arrow-up::before {{ top: -6px; }}
-  .daypop.arrow-down::before {{ bottom: -6px; transform: translateX(-50%) rotate(225deg); }}
+  .daypop-arrow.open {{ opacity: 1; }}
+  .daypop-arrow.arrow-up {{ transform: rotate(45deg); }}
+  .daypop-arrow.arrow-down {{ transform: rotate(225deg); }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -928,7 +944,7 @@ html = f'''<!doctype html>
       <span>Hari ini</span>
     </div>
     <div class="ping-legend">
-      <span><i class="lg-lxc"></i>RiV-meshBot{f" ({lxc_city})" if lxc_city else ""}</span>
+      <span><i class="lg-lxc"></i>{bot_display_name}{f" ({lxc_city})" if lxc_city else ""}</span>
       <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
     </div>
     <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
@@ -943,6 +959,7 @@ html = f'''<!doctype html>
     </div>
     <div id="daypop-body"></div>
   </div>
+  <div class="daypop-arrow" id="daypop-arrow"></div>
   <script>
     // Click-to-open day popover -- same interaction status.claude.com
     // uses (click a day cell, get a card with incident type + duration),
@@ -953,10 +970,12 @@ html = f'''<!doctype html>
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
+    var popArrow = document.getElementById("daypop-arrow");
     var activeBar = null;
 
     function closePop() {{
       pop.classList.remove("open");
+      popArrow.classList.remove("open");
       if (activeBar) activeBar.classList.remove("active");
       activeBar = null;
     }}
@@ -1056,7 +1075,6 @@ html = f'''<!doctype html>
         // card's own rounded corners.
         var arrowX = r.left + r.width / 2 - left;
         arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
-        pop.style.setProperty("--arrow-x", arrowX + "px");
         var spaceAbove = r.top;
         var vMargin = 8;
         pop.style.transform = "translateY(0)";
@@ -1081,6 +1099,25 @@ html = f'''<!doctype html>
         }}
         pop.style.left = left + "px";
         pop.classList.add("open");
+
+        // Arrow position is read back from the popover's ACTUAL
+        // rendered box (post-layout), not recomputed from the same
+        // top/bottom/left values used to place .daypop -- this stays
+        // correct even if content height changes what the browser
+        // settles on between the two top/bottom constraints, and it's
+        // immune to internal scrolling since this element lives
+        // outside .daypop entirely (see .daypop-arrow CSS comment).
+        var popRect = pop.getBoundingClientRect();
+        popArrow.classList.remove("arrow-up", "arrow-down");
+        if (pop.classList.contains("arrow-up")) {{
+          popArrow.style.top = (popRect.top - 5) + "px";
+          popArrow.classList.add("arrow-up");
+        }} else {{
+          popArrow.style.top = (popRect.bottom - 5) + "px";
+          popArrow.classList.add("arrow-down");
+        }}
+        popArrow.style.left = (popRect.left + arrowX - 5) + "px";
+        popArrow.classList.add("open");
       }});
     }});
 

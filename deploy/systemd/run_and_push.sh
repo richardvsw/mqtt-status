@@ -35,6 +35,23 @@ MQTT_CHECK_USER="$(python3 -c "import json; print(json.load(open('/opt/rivbot-ui
 MQTT_CHECK_PASS="$(python3 -c "import json; print(json.load(open('/opt/rivbot-ui/data/secrets.json')).get('mqtt_pass',''))")"
 export MQTT_CHECK_USER MQTT_CHECK_PASS
 
+# 2026-08-22: the ping-legend label used to hardcode "RiV-meshBot" --
+# the bot's own node can be (and has been) renamed via
+# `meshtastic --set-owner`, so pull the live longName from meshtasticd
+# on every run instead of a string that goes stale the moment someone
+# renames it. Best-effort: a failed/slow query just leaves
+# BOT_LONG_NAME empty, and check_and_render.py falls back to whatever
+# was last persisted in state.json's _meta rather than failing the
+# whole publish over this.
+BOT_LONG_NAME="$(timeout 8 python3 -c "
+from meshtastic.tcp_interface import TCPInterface
+iface = TCPInterface(hostname='localhost')
+name = iface.getMyNodeInfo().get('user', {}).get('longName', '')
+iface.close()
+print(name)
+" 2>/dev/null || true)"
+export BOT_LONG_NAME
+
 python3 check_and_render.py
 
 git add index.html history.json state.json log.jsonl brokers.json
@@ -42,7 +59,7 @@ if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else
     git -c user.name="mqtt-status-lxc" -c user.email="lxc@rivbot.local" \
-        commit --quiet -m "Update status (LXC) $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
+        commit --quiet -m "Update status (LXC) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     # This box is the primary publisher and Actions now defers to it, so
     # a real collision should be rare -- but not impossible right at the
     # boundary of Actions' own 5-min defer window. 2 retries is enough
