@@ -664,6 +664,34 @@ html = f'''<!doctype html>
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
+  .info-btn {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.05rem; height: 1.05rem; margin-left: .3rem; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surf2); color: var(--muted);
+    font-size: .68rem; font-weight: 700; line-height: 1; cursor: pointer;
+    vertical-align: .1rem; padding: 0;
+  }}
+  .info-btn:hover {{ color: var(--text); border-color: var(--muted); }}
+  .info-modal-backdrop {{
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 1.2rem;
+    opacity: 0; pointer-events: none; transition: opacity .15s ease;
+  }}
+  .info-modal-backdrop.open {{ opacity: 1; pointer-events: auto; }}
+  .info-modal {{
+    background: var(--surf2); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 380px; width: 100%; padding: 1rem 1.1rem; box-shadow: 0 12px 32px rgba(0,0,0,.3);
+    transform: translateY(6px); transition: transform .15s ease;
+  }}
+  .info-modal-backdrop.open .info-modal {{ transform: translateY(0); }}
+  .info-modal-head {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem; }}
+  .info-modal-head span {{ font-weight: 650; font-size: .92rem; }}
+  .info-modal-close {{ background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: .15rem; border-radius: 5px; }}
+  .info-modal-close:hover {{ color: var(--text); background: var(--border-soft); }}
+  .info-modal-body {{ font-size: .84rem; line-height: 1.55; color: var(--muted); }}
+  .info-modal-body b {{ color: var(--text); }}
+  .info-modal-body ol {{ margin: .5rem 0 0; padding-left: 1.2rem; }}
+  .info-modal-body li {{ margin-bottom: .35rem; }}
 </style>
 </head>
 <body>
@@ -675,7 +703,23 @@ html = f'''<!doctype html>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
-    <p class="note">Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover).{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
+    <p class="note">Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover)<button class="info-btn" id="dnsInfoBtn" aria-label="Cara kerja DNS failover" title="Cara kerja DNS failover">?</button>.{f" Saat ini terkoneksi ke: <b>{_failover_target}</b>." if _failover_target else ""}</p>
+    <div class="info-modal-backdrop" id="dnsInfoBackdrop">
+      <div class="info-modal">
+        <div class="info-modal-head">
+          <span>Cara kerja DNS failover</span>
+          <button class="info-modal-close" id="dnsInfoClose" aria-label="Tutup">✕</button>
+        </div>
+        <div class="info-modal-body">
+          <p><b>mqtt.rivi.my.id</b> adalah alamat MQTT tetap yang otomatis diarahkan (via Cloudflare DNS) ke broker yang sedang sehat, sehingga node tidak perlu mengganti alamat broker secara manual saat terjadi gangguan.</p>
+          <ol>
+            <li>Secara default mengarah ke <b>mqtt.meshnode.id</b> (broker utama) selama broker itu sehat.</li>
+            <li>Jika broker utama down atau menolak autentikasi, DNS otomatis dialihkan ke <b>mqtt1.meshnode.id</b> sampai <b>mqtt5.meshnode.id</b> secara berurutan, memilih broker cadangan pertama yang sehat.</li>
+            <li>Begitu broker utama pulih, DNS otomatis kembali ke <b>mqtt.meshnode.id</b>.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
     <div class="panel">{"".join(rows)}</div>
     {_event_log_html()}
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
@@ -790,6 +834,23 @@ html = f'''<!doctype html>
     window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
     if (window.visualViewport) {{ window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }}); }}
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
+
+    var dnsInfoBtn = document.getElementById("dnsInfoBtn");
+    var dnsInfoBackdrop = document.getElementById("dnsInfoBackdrop");
+    var dnsInfoClose = document.getElementById("dnsInfoClose");
+    if (dnsInfoBtn && dnsInfoBackdrop) {{
+      dnsInfoBtn.addEventListener("click", function (e) {{
+        e.stopPropagation();
+        dnsInfoBackdrop.classList.add("open");
+      }});
+      dnsInfoClose.addEventListener("click", function () {{ dnsInfoBackdrop.classList.remove("open"); }});
+      dnsInfoBackdrop.addEventListener("click", function (e) {{
+        if (e.target === dnsInfoBackdrop) dnsInfoBackdrop.classList.remove("open");
+      }});
+      document.addEventListener("keydown", function (e) {{
+        if (e.key === "Escape") dnsInfoBackdrop.classList.remove("open");
+      }});
+    }}
     document.addEventListener("click", function (e) {{ if (pop.classList.contains("open") && !pop.contains(e.target)) closePop(); }});
     window.addEventListener("scroll", closePop, {{ passive: true }});
 
