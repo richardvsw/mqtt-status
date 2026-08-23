@@ -304,6 +304,14 @@ def _build_real_incidents():
 
 REAL_INCIDENTS = _build_real_incidents()
 
+# 2026-08-23: see check_and_render.py's identical comment -- lets the
+# live "Down · Xm" badge agree with the incident popover's merged
+# duration instead of resetting on a brief mid-outage recovery blip.
+_OPEN_INCIDENT_START = {}
+for _svc, _incs in REAL_INCIDENTS.items():
+    if _incs and _incs[-1]["end"] is None:
+        _OPEN_INCIDENT_START[_svc] = _incs[-1]["start"]
+
 
 def _clip_incidents_to_day(svc, d):
     day_start = datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=WIB).timestamp()
@@ -423,7 +431,8 @@ for svc in SERVICES:
     else:
         down_svcs.append(SERVICE_LABEL[svc])
     if down:
-        dur = fmt_duration(now - st["current_outage_start"])
+        _start = _OPEN_INCIDENT_START.get(svc, st["current_outage_start"])
+        dur = fmt_duration(now - _start)
         status_label, status_class = f"Down · {dur}", "down"
     else:
         status_label, status_class = "Aktif", "up"

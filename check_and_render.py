@@ -498,6 +498,22 @@ def _build_real_incidents():
 
 
 REAL_INCIDENTS = _build_real_incidents()
+
+# 2026-08-23: lookup of each host's CURRENTLY-OPEN merged incident start
+# time (kind -> start), so the live "Down · Xm"/"Autentikasi Ditolak ·
+# Xm" badge can agree with the incident popover's duration instead of
+# the two disagreeing whenever a brief recovery-then-fail blip resets
+# state.json's current_outage_start mid-outage (confirmed live: mqtt5
+# flickered reachable for ~2 checks mid-outage on 2026-08-23, resetting
+# the badge to "2m" while the popover correctly still showed the whole
+# ~28min merged span). Falls back to state.json's own current_*_start
+# when there's no matching open REAL_INCIDENTS entry yet -- a fresh
+# outage under MIN_INCIDENT_SECONDS hasn't been promoted into
+# REAL_INCIDENTS yet, so the simple calculation is still correct there.
+_OPEN_INCIDENT_START = {}
+for _host, _incs in REAL_INCIDENTS.items():
+    if _incs and _incs[-1]["end"] is None:
+        _OPEN_INCIDENT_START[(_host, _incs[-1]["kind"])] = _incs[-1]["start"]
 KIND_LABEL = {"down": "Down", "autherr": "Autentikasi Ditolak"}
 
 
@@ -742,11 +758,13 @@ for host in BROKERS:
             parts.append(f'<span class="ping ping-ci">{b["actions_latency_ms"]}ms</span>')
         status_label = "Aktif · " + " · ".join(parts) if parts else "Aktif"
     elif b["auth_error"]:
-        dur = fmt_duration(now - b["current_auth_start"]) if b["current_auth_start"] else "?"
+        _start = _OPEN_INCIDENT_START.get((host, "autherr"), b["current_auth_start"])
+        dur = fmt_duration(now - _start) if _start else "?"
         status_label, status_class = f"Autentikasi Ditolak · {dur}", "autherr"
         auth_hosts.append(host)
     else:
-        dur = fmt_duration(now - b["current_outage_start"]) if b["current_outage_start"] else "?"
+        _start = _OPEN_INCIDENT_START.get((host, "down"), b["current_outage_start"])
+        dur = fmt_duration(now - _start) if _start else "?"
         status_label, status_class = f"Down · {dur}", "down"
         down_hosts.append(host)
     uptime_pct = host_uptime_pct(host)
