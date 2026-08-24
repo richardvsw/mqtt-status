@@ -1161,8 +1161,10 @@ html = f'''<!doctype html>
   .incident-rows {{ padding: 0 1.1rem 1rem; }}
   .incident-row {{
     display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
-    padding: .3rem 0; flex-wrap: wrap;
+    padding: .45rem 0; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-soft);
   }}
+  .incident-row:last-child {{ border-bottom: none; }}
   .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
   .incident-icon.down {{ color: var(--crit); }}
   .incident-icon.autherr {{ color: var(--warn); }}
