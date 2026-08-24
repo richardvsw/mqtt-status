@@ -850,9 +850,11 @@ def _incident_log_html():
                 parts.append(f"{n_down} down")
             if n_auth:
                 parts.append(f"{n_auth} auth ditolak")
+            dot_kind = "down" if n_down else "autherr"
             group_blocks.append(f'''
             <div class="incident-host-group">
               <div class="incident-host-header">
+                <span class="dot {dot_kind}"></span>
                 <span class="incident-host">{host}</span>
                 <span class="incident-host-count">{" · ".join(parts)}</span>
               </div>
@@ -1203,7 +1205,7 @@ html = f'''<!doctype html>
   .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
   .incident-icon.down {{ color: var(--crit); }}
   .incident-icon.autherr {{ color: var(--warn); }}
-  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); font-weight: 650; font-size: .7rem; letter-spacing: .03em; text-transform: uppercase; flex-shrink: 0; }}
+  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); font-weight: 650; font-size: .76rem; flex-shrink: 0; }}
   .incident-label {{ font-weight: 600; }}
   .incident-time {{ color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }}
 
