@@ -819,16 +819,47 @@ def _incident_log_html():
         return '<p class="note">Tidak ada insiden tercatat dalam 30 hari terakhir.</p>'
     blocks = []
     for d, entries in incident_days:
-        rows_html = "".join(
-            f'''<div class="incident-row">
+        # 2026-08-24: grouped by host instead of one flat chronological
+        # list -- a bad day flapping across 6 brokers interleaved their
+        # rows so tightly it was hard to follow any ONE broker's own
+        # story. Groups ordered by each host's first incident that day,
+        # so the day still roughly reads left-to-right chronologically
+        # at the group level; each group's own rows stay chronological.
+        by_host = {}
+        host_order = []
+        for e in entries:
+            if e["host"] not in by_host:
+                by_host[e["host"]] = []
+                host_order.append(e["host"])
+            by_host[e["host"]].append(e)
+        group_blocks = []
+        for host in host_order:
+            host_entries = by_host[host]
+            host_rows = "".join(
+                f'''<div class="incident-row">
               <span class="incident-icon {e["kind"]}">{incident_kind_icon.get(e["kind"], "✕")}</span>
-              <span class="incident-host">{e["host"]}</span>
               <span class="incident-label">{e["label"]}</span>
               <span class="incident-time">{e["start_clock"]}–{e["end_clock"]} WIB</span>
             </div>'''
-            for e in entries
-        )
-        n_hosts = len({e["host"] for e in entries})
+                for e in host_entries
+            )
+            n_down = sum(1 for e in host_entries if e["kind"] == "down")
+            n_auth = sum(1 for e in host_entries if e["kind"] == "autherr")
+            parts = []
+            if n_down:
+                parts.append(f"{n_down} down")
+            if n_auth:
+                parts.append(f"{n_auth} auth ditolak")
+            group_blocks.append(f'''
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="incident-host">{host}</span>
+                <span class="incident-host-count">{" · ".join(parts)}</span>
+              </div>
+              {host_rows}
+            </div>''')
+        rows_html = "".join(group_blocks)
+        n_hosts = len(host_order)
         summary_text = f"{len(entries)} insiden · {n_hosts} broker terdampak"
         blocks.append(f'''
         <details class="incident-day">
@@ -1159,16 +1190,20 @@ html = f'''<!doctype html>
   .incident-date {{ font-weight: 600; font-size: .82rem; }}
   .incident-count {{ color: var(--faint); font-size: .76rem; margin-left: auto; }}
   .incident-rows {{ padding: 0 1.1rem 1rem; }}
+  .incident-host-group {{ border-top: 2px solid var(--border); padding-top: .6rem; margin-top: .6rem; }}
+  .incident-host-group:first-child {{ border-top: none; padding-top: 0; margin-top: 0; }}
+  .incident-host-header {{ display: flex; align-items: baseline; gap: .5rem; margin-bottom: .2rem; }}
+  .incident-host-count {{ color: var(--faint); font-size: .74rem; margin-left: auto; }}
   .incident-row {{
     display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
-    padding: .45rem 0; flex-wrap: wrap;
+    padding: .4rem 0 .4rem 1.3rem; flex-wrap: wrap;
     border-bottom: 1px solid var(--border-soft);
   }}
   .incident-row:last-child {{ border-bottom: none; }}
   .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
   .incident-icon.down {{ color: var(--crit); }}
   .incident-icon.autherr {{ color: var(--warn); }}
-  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); flex-shrink: 0; }}
+  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--text); font-weight: 700; font-size: .84rem; flex-shrink: 0; }}
   .incident-label {{ font-weight: 600; }}
   .incident-time {{ color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }}
 
