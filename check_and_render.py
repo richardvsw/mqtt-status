@@ -1190,10 +1190,10 @@ html = f'''<!doctype html>
   .incident-date {{ font-weight: 600; font-size: .82rem; }}
   .incident-count {{ color: var(--faint); font-size: .76rem; margin-left: auto; }}
   .incident-rows {{ padding: 0 1.1rem 1rem; }}
-  .incident-host-group {{ border-top: 2px solid var(--border); padding-top: .6rem; margin-top: .6rem; }}
+  .incident-host-group {{ border-top: 1px solid var(--border-soft); padding-top: .55rem; margin-top: .55rem; }}
   .incident-host-group:first-child {{ border-top: none; padding-top: 0; margin-top: 0; }}
-  .incident-host-header {{ display: flex; align-items: baseline; gap: .5rem; margin-bottom: .2rem; }}
-  .incident-host-count {{ color: var(--faint); font-size: .74rem; margin-left: auto; }}
+  .incident-host-header {{ display: flex; align-items: baseline; gap: .5rem; margin-bottom: .1rem; }}
+  .incident-host-count {{ color: var(--faint); font-size: .68rem; margin-left: auto; }}
   .incident-row {{
     display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
     padding: .4rem 0 .4rem 1.3rem; flex-wrap: wrap;
@@ -1203,7 +1203,7 @@ html = f'''<!doctype html>
   .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
   .incident-icon.down {{ color: var(--crit); }}
   .incident-icon.autherr {{ color: var(--warn); }}
-  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--text); font-weight: 700; font-size: .84rem; flex-shrink: 0; }}
+  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); font-weight: 650; font-size: .7rem; letter-spacing: .03em; text-transform: uppercase; flex-shrink: 0; }}
   .incident-label {{ font-weight: 600; }}
   .incident-time {{ color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }}
 
