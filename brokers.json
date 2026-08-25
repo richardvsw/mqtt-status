@@ -4,6 +4,5 @@
   "mqtt2.meshnode.id",
   "mqtt3.meshnode.id",
   "mqtt4.meshnode.id",
-  "mqtt5.meshnode.id",
-  "mqtt6.meshnode.id"
+  "mqtt5.meshnode.id"
 ]

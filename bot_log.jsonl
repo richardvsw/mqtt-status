@@ -1751,46 +1751,203 @@
 {"ts": 1787641689.5039375, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787641808.732541, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787641928.76755, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787642048.7765589, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787642169.3135834, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787642289.0129318, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787642408.8717165, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787643028.5763574, "checks": {"lxc-monitor": "up"}}
-{"ts": 1787643621.1639163, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787644223.57668, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787644835.497748, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787645421.9658833, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787646023.8905303, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787646627.9958036, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787647226.8689938, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787647823.4424748, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787648434.6811397, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787649022.3194516, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787649621.4049199, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787650229.7586787, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787650823.8013875, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787651422.6863976, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787652034.6089942, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787652621.3408775, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787653226.2696285, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787653827.9577103, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787654423.734943, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787655021.3433793, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787655635.4619455, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787656222.7548048, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787656823.4479218, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787657435.3079586, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787658025.612673, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787658625.4515502, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787659235.6408834, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787659823.878826, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787660429.0297484, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787661046.6939788, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787661643.6187284, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787662242.905157, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787662850.4727924, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787663442.5042346, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787664041.8898394, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787664651.4312828, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787665241.7175746, "checks": {"lxc-monitor": "down"}}
-{"ts": 1787665844.1232786, "checks": {"lxc-monitor": "down"}}
+{"ts": 1787642232.394294, "checks": {"lxc-monitor": "up"}}
+{"ts": 1787642393.7596445, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787642649.9963837, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787642769.6690788, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787642889.770636, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643010.0242102, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643130.1572545, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643250.0328662, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643369.7932358, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643489.979704, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643610.071764, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643729.85915, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643850.8531582, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787643970.1713803, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644091.2344666, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644210.090467, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644330.111493, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644450.0608974, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644570.1291368, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644690.3451726, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644810.5976968, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787644958.505096, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645050.9816294, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645170.7046435, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645295.4131908, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645410.4299765, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645530.3701994, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645650.5757437, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645770.5647209, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787645890.4596345, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646010.5577848, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646135.7716475, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646251.0575688, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646371.1793885, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646490.7338624, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646611.0914052, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646732.0747643, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646850.8549707, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787646971.0715327, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647090.919949, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647210.8888452, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647331.203578, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647451.4169436, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647570.947276, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647691.142852, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647811.1446707, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787647931.24295, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648051.3581932, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648171.4191096, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648291.604604, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648412.0350957, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648531.2637427, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648651.4792156, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648771.8245215, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787648892.0077245, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649016.7220006, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649131.5828733, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649251.7707512, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649371.9590385, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649492.219978, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649611.8817935, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649731.6439404, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649851.8424351, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787649977.1989918, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650092.047308, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650211.9228003, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650333.902791, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650458.8031163, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650580.0287213, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650704.0133305, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650824.0753684, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787650948.7925053, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651070.290821, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651190.4548705, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651310.3317535, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651430.2396088, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651550.5023534, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651670.4296687, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651790.3542502, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787651910.7980957, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652030.7958138, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652150.5143816, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652270.8252666, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652390.4868333, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652510.3874097, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652630.6354945, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652750.6132991, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652870.6141684, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787652991.0846448, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653110.6994903, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653230.8246949, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653351.0322278, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653470.9180427, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653590.9272404, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653711.1946363, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653831.5507038, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787653951.4497788, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654071.0753226, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654191.3805506, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654311.6011992, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654433.3936968, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654551.627729, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654671.5127199, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654791.4248106, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787654911.648196, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655031.5267196, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655152.6219826, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655272.5753005, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655391.4323812, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655512.825605, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655633.5076177, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655751.7574205, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655871.7576718, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787655991.7048755, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656111.886708, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656232.2162025, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656351.835152, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656471.7473788, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656592.3746147, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656712.0242193, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656832.775655, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787656952.038765, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657072.1578398, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657191.9648073, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657314.195239, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657434.2978482, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657552.7128582, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657672.4759855, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657792.756875, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787657912.8921273, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658032.7900085, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658152.546855, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658272.597479, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658393.676009, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658513.4833553, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658637.6962023, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658752.4958355, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658872.9862351, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787658993.0091038, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659113.7421653, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659233.407819, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659352.5944362, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659473.4121659, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659594.1843345, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659712.7921429, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659833.3973603, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787659953.312538, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660074.2944455, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660193.0485892, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660313.4491956, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660432.9389932, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660553.9881575, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660673.3509607, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660793.3275435, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787660914.6256466, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661033.5389268, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661154.125796, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661275.1702108, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661394.7131855, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661513.6641395, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661633.745462, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661753.988801, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661873.7643754, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787661995.1983595, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662113.7308278, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662233.6649623, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662354.106356, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662475.2349482, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662595.1408963, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662713.920512, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662834.4385598, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787662956.2351964, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663074.2843678, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663194.3311436, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663315.2424793, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663434.2360501, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663554.3151782, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663674.3731632, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663794.0210798, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787663914.0591846, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664035.1202028, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664154.2516513, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664274.3072398, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664395.611663, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664514.3673546, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664634.4141214, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664754.8440385, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664877.0098162, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787664994.280476, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665115.3101199, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665234.630966, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665354.3739133, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665474.5421994, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665595.108658, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665714.7558062, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665834.7342796, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787665954.7287638, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787666075.4007325, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787666194.80235, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1787666255.8575437, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
