@@ -1793,3 +1793,4 @@
 {"ts": 1787664041.8898394, "checks": {"lxc-monitor": "down"}}
 {"ts": 1787664651.4312828, "checks": {"lxc-monitor": "down"}}
 {"ts": 1787665241.7175746, "checks": {"lxc-monitor": "down"}}
+{"ts": 1787665844.1232786, "checks": {"lxc-monitor": "down"}}
