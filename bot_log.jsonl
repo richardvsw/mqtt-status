@@ -2548,3 +2548,4 @@
 {"ts": 1787738500.3393056, "checks": {"lxc-monitor": "up"}}
 {"ts": 1787739086.9419265, "checks": {"lxc-monitor": "down"}}
 {"ts": 1787739692.085289, "checks": {"lxc-monitor": "down"}}
+{"ts": 1787740295.1129467, "checks": {"lxc-monitor": "down"}}
