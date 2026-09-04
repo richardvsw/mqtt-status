@@ -33,13 +33,11 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 
-IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
-# Only this box ever writes to it (see ntfy.py's own comment) --
-# GitHub Actions has no path to it at all, same as mesh_bot/
-# meshtasticd themselves.
-EVENT_LOG_PATH = "/opt/rivbot-ui/data/bot_events.jsonl"
-EVENT_LOG_MAX_AGE_DAYS = 30
-EVENT_LOG_MAX_ENTRIES = 200
+# 2026-09-04: this always runs from GitHub Actions now (see
+# PUBLIC_STATUS_URL below) -- the old IS_CI split and the local-file
+# EVENT_LOG_* constants (this box's own bot_events.jsonl, unreachable
+# from a GitHub Actions runner) are gone; event data comes over HTTP
+# from /api/public/events instead (see _load_bot_events()).
 
 WIB = timezone(timedelta(hours=7))
 HISTORY_DIR = "bot_history"
@@ -86,12 +84,30 @@ def _current_failover_target():
 
 _failover_target = _current_failover_target()
 
-SERVICES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
+SERVICES = ["mesh_bot", "meshtasticd"]
 SERVICE_LABEL = {
     "mesh_bot": "mesh_bot.service",
     "meshtasticd": "meshtasticd.service",
-    "lxc-monitor": "Server (Cikarang)",
 }
+
+# 2026-09-04: replaces the old two-sided design (a local LXC check that
+# git-committed its results, plus a GitHub-Actions-side "has the LXC
+# committed recently" staleness inference standing in for a real check
+# it couldn't make itself) with one direct HTTP check against the bot's
+# own public status API (meshbot.rivi.my.id), reachable from anywhere,
+# including this script running on a GitHub Actions runner. The local
+# LXC-side git push/pull/discard dance is gone entirely -- no more
+# credential-helper HOME hack, no more risk of an uncommitted local edit
+# to this very file getting silently discarded by the next automated
+# pull (confirmed live: that happened to this file's own staleness-badge
+# fix before this rewrite existed). A failed/timed-out request now
+# directly means "can't confirm the bot is up," reported as down for
+# BOTH services rather than an ambiguous "last known state, possibly
+# stale" -- more accurate than the git-staleness proxy ever was, since
+# it's testing actual reachability instead of inferring it.
+PUBLIC_STATUS_URL = "https://meshbot.rivi.my.id/api/public/status"
+PUBLIC_EVENTS_URL = "https://meshbot.rivi.my.id/api/public/events"
+PUBLIC_API_TIMEOUT = 15
 
 
 def sh(cmd):
@@ -139,44 +155,21 @@ now = time.time()
 state = load_json(STATE_PATH, {})
 meta = state.setdefault("_meta", {})
 
-checks = {}  # service -> "up" / "down", only services actually checked THIS run
+checks = {}  # service -> "up" / "down"
 
-if not IS_CI:
-    # ── Real local checks (LXC only) ────────────────────────────────────
-    mesh_bot_active = sh("systemctl is-active mesh_bot") == "active"
-    meshtasticd_active = sh("systemctl is-active meshtasticd") == "active"
-    checks["mesh_bot"] = "up" if mesh_bot_active else "down"
-    checks["meshtasticd"] = "up" if meshtasticd_active else "down"
-    # This code only runs when the LXC is clearly alive (it's the one
-    # executing right now), so lxc-monitor is definitionally "up" here --
-    # the interesting case (down) can only ever be detected from the
-    # OUTSIDE (the IS_CI branch below), same as how a heartbeat only
-    # means something to someone ELSE watching for its absence.
-    checks["lxc-monitor"] = "up"
-    meta["last_lxc_check_ts"] = now
-
-    try:
-        health = json.load(urllib.request.urlopen("http://localhost:8080/api/bot/health", timeout=8))
-        if health.get("last_reply_ts"):
-            meta["last_reply_ts"] = health["last_reply_ts"]
-    except Exception as e:
-        print(f"bot health API fetch failed: {e}")
-
-    restarts_raw = sh("systemctl show mesh_bot --property=NRestarts").replace("NRestarts=", "")
-    try:
-        meta["restart_count"] = int(restarts_raw)
-    except ValueError:
-        pass
-else:
-    # ── GitHub Actions: can only judge LXC staleness, nothing else ──────
-    last_ts = meta.get("last_lxc_check_ts")
-    stale = (last_ts is None) or (now - last_ts > LXC_STALE_SECONDS)
-    checks["lxc-monitor"] = "down" if stale else "up"
-    # mesh_bot/meshtasticd deliberately get NO data point this run --
-    # neither service is reachable from here, and writing a fabricated
-    # "unknown" status would just be noise; their last real (LXC-
-    # sourced) state stays exactly as it was, clearly timestamped by
-    # whichever day it's still showing.
+try:
+    with urllib.request.urlopen(PUBLIC_STATUS_URL, timeout=PUBLIC_API_TIMEOUT) as resp:
+        pub = json.load(resp)
+    checks["mesh_bot"] = "up" if pub.get("bot_service") == "active" else "down"
+    checks["meshtasticd"] = "up" if pub.get("meshtasticd_service") == "active" else "down"
+    if pub.get("last_reply_ago") is not None:
+        meta["last_reply_ts"] = now - pub["last_reply_ago"]
+    if pub.get("restart_count") is not None:
+        meta["restart_count"] = pub["restart_count"]
+except Exception as e:
+    print(f"public status API unreachable, reporting down: {e}")
+    checks["mesh_bot"] = "down"
+    checks["meshtasticd"] = "down"
 
 for svc, status in checks.items():
     st = state.setdefault(svc, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
@@ -476,28 +469,22 @@ def _load_bot_events():
     """Every entry ntfy.notify() has ever logged (restarts, broker
     switches, NodeDB resets, etc.) -- real human-written context from
     whoever/whatever triggered the action, not re-derived from the
-    generic up/down checks above. Newest first, capped by both age and
-    count so this section can't grow unbounded."""
-    if IS_CI or not os.path.exists(EVENT_LOG_PATH):
-        return []
-    cutoff = now - EVENT_LOG_MAX_AGE_DAYS * 86400
-    events = []
+    generic up/down checks above.
+
+    2026-09-04: used to read EVENT_LOG_PATH directly, which only ever
+    worked when this script ran ON the LXC itself (the file it wanted
+    doesn't exist on a GitHub Actions runner). Now that this always
+    runs from Actions (see the PUBLIC_STATUS_URL switch above), it
+    fetches the same data via /api/public/events instead -- that route
+    already applies the same age/count capping this used to do locally,
+    so this is a thin pass-through, best-effort (a fetch failure just
+    means an empty events section this run, not a hard error)."""
     try:
-        with open(EVENT_LOG_PATH) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if rec.get("ts", 0) >= cutoff:
-                    events.append(rec)
-    except Exception:
+        with urllib.request.urlopen(PUBLIC_EVENTS_URL, timeout=PUBLIC_API_TIMEOUT) as resp:
+            return json.load(resp)
+    except Exception as e:
+        print(f"public events API fetch failed: {e}")
         return []
-    events.sort(key=lambda r: r["ts"], reverse=True)
-    return events[:EVENT_LOG_MAX_ENTRIES]
 
 
 def _event_row_time(ts):
@@ -507,8 +494,6 @@ def _event_row_time(ts):
 
 def _event_log_html():
     events = _load_bot_events()
-    if IS_CI:
-        return ""  # section omitted entirely on the Actions side -- nothing to show, not "no events"
     if not events:
         return '<p class="note">Belum ada kejadian tercatat.</p>'
     rows_html = "".join(
@@ -880,4 +865,4 @@ html = f'''<!doctype html>
 
 with open(OUT_PATH, "w") as f:
     f.write(html)
-print(f"wrote {OUT_PATH} ({up_count}/{total} services up, IS_CI={IS_CI})")
+print(f"wrote {OUT_PATH} ({up_count}/{total} services up)")

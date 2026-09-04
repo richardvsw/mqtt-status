@@ -39,11 +39,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-      # 2026-08-22: can't check mesh_bot/meshtasticd themselves from here
-      # (private services on a home LXC, no network path in) -- this
-      # script self-detects IS_CI and only evaluates whether the LXC's
-      # OWN last check has gone stale, recording that as its own
-      # "lxc-monitor" outage. See check_bot_status.py's docstring.
+      # 2026-09-04: check_bot_status.py now polls the bot's own public
+      # API (meshbot.rivi.my.id) directly over HTTPS -- reachable from
+      # here just like anywhere else on the internet, so this gets a
+      # real live check of mesh_bot/meshtasticd, not an inferred one.
       - run: python3 check_bot_status.py
       - name: Skip publish if the LXC already did recently
         id: guard
@@ -71,7 +70,7 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Commit and push if changed
+      - name: Commit broker status if changed (skip if LXC just did)
         if: steps.guard.outputs.skip != 'true'
         # 2026-08-22: GitHub-hosted runners default to UTC, while the
         # LXC-side publisher's commits naturally carry WIB (its system
@@ -88,14 +87,17 @@ jobs:
           # history.json was split into history/YYYY-MM.json a while back
           # and notice.json was added, but this list was never updated to
           # match, so a fallback run would have silently failed to commit
-          # either. bot-status.html/bot_history/bot_state.json/
-          # bot_log.jsonl added alongside check_bot_status.py above.
-          git add index.html history state.json log.jsonl brokers.json notice.json bot-status.html bot_history bot_state.json bot_log.jsonl
+          # either.
+          # 2026-09-04: bot-status.html/bot_history/bot_state.json/
+          # bot_log.jsonl moved to their own unguarded step below -- see
+          # that step's own comment for why they can't share this one's
+          # guard anymore.
+          git add index.html history state.json log.jsonl brokers.json notice.json
           if git diff --cached --quiet; then
-            echo "no changes to publish"
+            echo "no broker changes to publish"
             exit 0
           fi
-          git commit -m "Update status $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
+          git commit -m "Update broker status $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
           # Retries here now only cover a genuine simultaneous collision
           # (both sides finishing within the same instant) -- the guard
           # step above already eliminates the much larger "any overlap
@@ -113,5 +115,36 @@ jobs:
             git fetch origin main
             git rebase -X ours origin/main
           done
-          echo "failed to push after 3 attempts"
+          echo "failed to push broker status after 3 attempts"
+          exit 1
+      # 2026-09-04: unguarded and separate from the broker commit above --
+      # check_bot_status.py now polls the bot's own public API directly
+      # instead of the LXC pushing these files here itself, so this
+      # workflow (on its own ~10-min external-cron schedule) is the ONLY
+      # thing that ever publishes them to this repo. Gating them behind
+      # "did the LXC just publish broker data" would mean they almost
+      # never actually get committed, since the LXC still pushes broker
+      # data every 2 min and that window is >=5 min most of the time this
+      # workflow runs.
+      - name: Commit bot status if changed (always attempted)
+        env:
+          TZ: Asia/Jakarta
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bot-status.html bot_history bot_state.json bot_log.jsonl
+          if git diff --cached --quiet; then
+            echo "no bot status changes to publish"
+            exit 0
+          fi
+          git commit -m "Update bot status $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
+          for i in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "push rejected (attempt $i), rebasing onto origin/main and retrying"
+            git fetch origin main
+            git rebase -X ours origin/main
+          done
+          echo "failed to push bot status after 3 attempts"
           exit 1
