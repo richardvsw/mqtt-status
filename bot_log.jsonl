@@ -8906,3 +8906,4 @@
 {"ts": 1788507250.9233904, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1788507371.7912452, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1788507491.0511892, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
+{"ts": 1788508288.3041334, "checks": {"lxc-monitor": "up"}}
