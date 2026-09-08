@@ -884,18 +884,21 @@ for host in BROKERS:
         # Actions check here, plus the separate real-time local ping in
         # .live-status below), showing both with their own color is
         # useful again instead of ambiguous.
-        status_label = (f'Aktif · <span class="ping ping-ci">{b["latency_ms"]}ms</span>'
-                         if b.get("latency_ms") is not None else "Aktif")
+        status_label = "Aktif"
+        actions_ping_html = (f' · <span class="ping ping-ci">{b["latency_ms"]}ms</span>'
+                              if b.get("latency_ms") is not None else "")
     elif b["auth_error"]:
         _start = _OPEN_INCIDENT_START.get((host, "autherr"), b["current_auth_start"])
         dur = fmt_duration(now - _start) if _start else "?"
         status_label, status_class = f"Autentikasi Ditolak · {dur}", "autherr"
+        actions_ping_html = ""
         auth_hosts.append(host)
     else:
         _start = _OPEN_INCIDENT_START.get((host, "down"), b["current_outage_start"])
         dur = fmt_duration(now - _start) if _start else "?"
         reason_label = DOWN_REASON_LABEL.get(b["down_reason"], "Down")
         status_label, status_class = f"{reason_label} · {dur}", "down"
+        actions_ping_html = ""
         down_hosts.append(host)
     uptime_pct = host_uptime_pct(host)
     uptime_label = f"{uptime_pct:.2f} % uptime" if uptime_pct is not None else "belum ada data"
@@ -903,7 +906,7 @@ for host in BROKERS:
         <div class="row">
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
-            <div class="status {status_class}">{status_label}<span class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></span></div>
+            <div class="status {status_class}">{status_label}<span class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></span>{actions_ping_html}</div>
           </div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
@@ -1198,13 +1201,14 @@ html = f'''<!doctype html>
      to flag (an early signal, not yet confirmed through the debounce
      above). Falls back to empty again if the last push from GitHub
      Actions is older than LIVE_STALE_SECONDS. */
-  /* Inline by default (right next to the confirmed "Aktif · Xms" text
-     -- 2026-09-09, moved off its own line so the two ping sources sit
-     side by side on one row instead of stacked). Only the mismatch
+  /* Inline right after "Aktif" -- 2026-09-09, moved off its own line so
+     the two ping sources sit side by side (local first, then GitHub
+     Actions) instead of stacked. Its own " · " separator is set in the
+     JS/Python that fill this in (not CSS margin), so an empty span (no
+     live data yet) takes up no visual space at all. Only the mismatch
      warning (a full sentence, doesn't fit inline) drops to its own
      line below. */
-  .live-status {{ font-size: .72rem; color: var(--faint); margin-left: .5rem; }}
-  .live-status:empty {{ margin-left: 0; }}
+  .live-status {{ font-size: .72rem; color: var(--faint); }}
   .live-status.live-mismatch {{
     display: block; margin-left: 0; margin-top: .3rem; color: var(--warn); font-weight: 600;
   }}
@@ -1741,7 +1745,7 @@ html = f'''<!doctype html>
               if (confirmedUp === liveUp) {{
                 el.className = "live-status";
                 el.innerHTML = (liveUp && b.latency_ms != null)
-                  ? '<span class="ping ping-lxc">' + b.latency_ms + 'ms</span>' : "";
+                  ? ' · <span class="ping ping-lxc">' + b.latency_ms + 'ms</span>' : "";
               }} else if (liveUp) {{
                 el.className = "live-status live-mismatch";
                 el.textContent = "⚠ Live check baru saja berhasil (" + fmtAge(age) + ") — belum dikonfirmasi";
