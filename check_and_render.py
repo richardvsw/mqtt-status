@@ -1227,7 +1227,7 @@ html = f'''<!doctype html>
      the nav links) and consolidated from a per-row repeat down to
      once, ticking every second client-side like #live-clock. */
   .ping-legend {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.2rem; margin-bottom: .6rem; font-size: .74rem; color: var(--faint); }}
-  .ping-legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
+  .ping-legend span {{ display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .35rem; }}
   .ping-legend i {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
   .ping-legend .lg-lxc {{ background: var(--ok); }}
   .ping-legend .lg-ci {{ background: var(--accent); }}
@@ -1402,8 +1402,8 @@ html = f'''<!doctype html>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>
       <div class="ping-legend">
-        <span><i class="lg-lxc"></i>Ping lokal (real-time, ~25 detik) • <span id="local-ping-summary">memuat...</span></span>
-        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"}) • <span id="actions-ping-summary">memuat...</span></span>
+        <span><i class="lg-lxc"></i>Ping lokal (Cikarang) • <span id="local-ping-summary">memuat...</span></span>
+        <span><i class="lg-ci"></i>Ping GitHub Actions{f" ({actions_city})" if actions_city else ""} • <span id="actions-ping-summary">memuat...</span></span>
       </div>
       Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a>
     </footer>
