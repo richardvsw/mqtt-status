@@ -45,6 +45,10 @@ STATE_PATH = "bot_state.json"
 OUT_PATH = "bot-status.html"
 HISTORY_DAYS = 30
 HISTORY_RETENTION_DAYS = 400
+# 2026-09-09: same fix as check_and_render.py's own LOG_RETENTION_DAYS --
+# bot_log.jsonl was never trimmed either. See that file's comment for
+# the full reasoning.
+LOG_RETENTION_DAYS = 90
 CONFIRM_THRESHOLD = 2
 # How stale the LXC's own last check can get before Actions marks a
 # "lxc-monitor" outage -- comfortably more than 2x the LXC's own 2-min
@@ -192,6 +196,17 @@ save_json(STATE_PATH, state)
 if checks:
     with open(LOG_PATH, "a") as f:
         f.write(json.dumps({"ts": now, "checks": checks}) + "\n")
+
+_log_cutoff_ts = now - LOG_RETENTION_DAYS * 86400
+try:
+    with open(LOG_PATH) as _f:
+        _kept_lines = [_line for _line in _f if _line.strip() and
+                       json.loads(_line).get("ts", 0) >= _log_cutoff_ts]
+    with open(LOG_PATH + ".tmp", "w") as _f:
+        _f.writelines(_kept_lines)
+    os.replace(LOG_PATH + ".tmp", LOG_PATH)
+except Exception as e:
+    print(f"log trim failed, leaving {LOG_PATH} as-is this run: {e}")
 
 # 2026-08-23: recomputed fresh from bot_log.jsonl every run instead of
 # an incrementally-updated counter -- see this file's own module

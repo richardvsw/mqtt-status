@@ -108,6 +108,18 @@ HISTORY_DAYS = 30
 # display window. Per-day storage cost is trivial (a handful of int
 # fields per host per day), so keeping over a year of it is cheap.
 HISTORY_RETENTION_DAYS = 400
+# 2026-09-09: log.jsonl (the raw per-check detail log REAL_INCIDENTS is
+# reconstructed from) was NEVER trimmed -- unlike history/*.json above,
+# every run just appended forever. Confirmed grown to 16MB/13k+ lines
+# well within the first month. This caps it to a rolling 3-month
+# window: old enough to keep exact incident start/end times for
+# uptime.html's popover across a full quarter, short enough that the
+# file (and the cost of re-reading it every run to rebuild
+# REAL_INCIDENTS) stays bounded instead of growing without limit. A day
+# older than this still shows its correct aggregate % on the calendar
+# (that comes from history/*.json, untouched by this), it just loses
+# the exact incident-by-incident popover detail for that day.
+LOG_RETENTION_DAYS = 90
 UPTIME_OUT_PATH = "uptime.html"
 
 CHECK_RETRIES = 10
@@ -466,11 +478,23 @@ for d in [d for d in history if d < cutoff_date]:
     del history[d]
 _save_history(history)
 
-# append this run'''s raw result to the detail log -- one line per check,
-# never rewritten/truncated (unlike history.json/state.json which hold
-# only the current rolled-up state)
+# append this run's raw result to the detail log -- one line per check
+# (unlike history.json/state.json which hold only the current
+# rolled-up state), then trim anything past LOG_RETENTION_DAYS so the
+# file stays a bounded rolling window instead of growing forever.
 with open(LOG_PATH, "a") as f:
     f.write(json.dumps({"ts": now, "brokers": brokers}) + "\n")
+
+_log_cutoff_ts = now - LOG_RETENTION_DAYS * 86400
+try:
+    with open(LOG_PATH) as _f:
+        _kept_lines = [_line for _line in _f if _line.strip() and
+                       json.loads(_line).get("ts", 0) >= _log_cutoff_ts]
+    with open(LOG_PATH + ".tmp", "w") as _f:
+        _f.writelines(_kept_lines)
+    os.replace(LOG_PATH + ".tmp", LOG_PATH)
+except Exception as e:
+    print(f"log trim failed, leaving {LOG_PATH} as-is this run: {e}")
 
 day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strftime("%Y-%m-%d")
               for i in range(HISTORY_DAYS - 1, -1, -1)]
