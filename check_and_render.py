@@ -487,6 +487,7 @@ def _build_real_incidents():
     MERGE_GAP_SECONDS = 600
     incidents = {}
     open_incident = {}
+    open_reason = {}  # (host, "down") -> most recent down_reason seen while this incident is open
     try:
         with open(LOG_PATH) as f:
             for line in f:
@@ -506,21 +507,39 @@ def _build_real_incidents():
                         if val:
                             if key not in open_incident:
                                 open_incident[key] = val
+                            if kind == "down":
+                                # Log lines from before down_reason existed carry no
+                                # key at all -- get() leaves the prior value (or
+                                # None) in place rather than clobbering a real
+                                # reason with a missing one.
+                                open_reason[key] = b.get("down_reason", open_reason.get(key))
                         elif key in open_incident:
                             start = open_incident.pop(key)
+                            reason = open_reason.pop(key, None) if kind == "down" else None
                             lst = incidents[host]
                             if lst and lst[-1]["kind"] == kind and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
                                 lst[-1]["end"] = ts
+                                if reason:
+                                    lst[-1]["reason"] = reason
                             else:
-                                lst.append({"kind": kind, "start": start, "end": ts})
+                                entry = {"kind": kind, "start": start, "end": ts}
+                                if reason:
+                                    entry["reason"] = reason
+                                lst.append(entry)
     except FileNotFoundError:
         pass
     for (host, kind), start in open_incident.items():
         lst = incidents.setdefault(host, [])
+        reason = open_reason.get((host, kind)) if kind == "down" else None
         if lst and lst[-1]["kind"] == kind and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
             lst[-1]["end"] = None
+            if reason:
+                lst[-1]["reason"] = reason
         else:
-            lst.append({"kind": kind, "start": start, "end": None})
+            entry = {"kind": kind, "start": start, "end": None}
+            if reason:
+                entry["reason"] = reason
+            lst.append(entry)
     # 2026-08-23: drop anything under MIN_INCIDENT_SECONDS -- a blip
     # that happened to straddle exactly CONFIRM_THRESHOLD checks isn't
     # a meaningful incident on its own (raw single-check blips already
@@ -652,9 +671,15 @@ def _clip_incidents_to_day(host, d):
             end_clock = "24:00"
         else:
             end_clock = datetime.fromtimestamp(seg_end, WIB).strftime("%H:%M")
+        if is_bot:
+            label = "Down"
+        elif inc["kind"] == "down":
+            label = DOWN_REASON_LABEL.get(inc.get("reason"), "Down")
+        else:
+            label = KIND_LABEL[inc["kind"]]
         out.append({
             "kind": "down" if is_bot else inc["kind"],
-            "label": "Down" if is_bot else KIND_LABEL[inc["kind"]],
+            "label": label,
             "seconds": seg_end - seg_start,
             "start_clock": datetime.fromtimestamp(seg_start, WIB).strftime("%H:%M"),
             "end_clock": end_clock,
