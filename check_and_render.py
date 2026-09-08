@@ -875,10 +875,17 @@ for host in BROKERS:
     if b["reachable"]:
         up_count += 1
         status_class = "up"
-        # Color-coded instead of repeating "(city name)" text on every
-        # row -- legend explaining what each color means lives once,
-        # below the panel (see .ping-legend).
-        status_label = "Aktif"
+        # Color-coded instead of repeating "(GitHub Actions)" text on
+        # every row -- legend explaining what each color means lives
+        # once, below the panel (see .ping-legend). Brought back
+        # 2026-09-09 after a brief stint of hiding all ping values --
+        # now that there's genuinely two distinct, independently
+        # meaningful vantage points again (this row's own GitHub
+        # Actions check here, plus the separate real-time local ping in
+        # .live-status below), showing both with their own color is
+        # useful again instead of ambiguous.
+        status_label = (f'Aktif · <span class="ping ping-ci">{b["latency_ms"]}ms</span>'
+                         if b.get("latency_ms") is not None else "Aktif")
     elif b["auth_error"]:
         _start = _OPEN_INCIDENT_START.get((host, "autherr"), b["current_auth_start"])
         dur = fmt_duration(now - _start) if _start else "?"
@@ -1199,11 +1206,13 @@ html = f'''<!doctype html>
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
   .status.autherr {{ color: var(--warn); }}
-  /* Ping values color-coded by source instead of repeating "(city name)"
-     text on every row -- see .ping-legend for what each color means. */
+  /* Ping values color-coded by source -- GitHub Actions' own confirmed
+     check (accent) vs the real-time local check (ok/green) -- see
+     .ping-legend in the footer for what each color means. */
+  .ping {{ font-variant-numeric: tabular-nums; font-weight: 600; }}
   .ping-lxc {{ color: var(--ok); }}
   .ping-ci {{ color: var(--accent); }}
-  .ping-legend {{ display: flex; justify-content: center; gap: 1.2rem; margin-top: .7rem; font-size: .74rem; color: var(--faint); }}
+  .ping-legend {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.2rem; margin-bottom: .6rem; font-size: .74rem; color: var(--faint); }}
   .ping-legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .ping-legend i {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
   .ping-legend .lg-lxc {{ background: var(--ok); }}
@@ -1367,7 +1376,7 @@ html = f'''<!doctype html>
         <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       </button>
     </div>
-    <div class="sub"><b>{up_count}/{total}</b> broker aktif — data diperbarui tiap 10 menit</div>
+    <div class="sub"><b>{up_count}/{total}</b> broker aktif — live tiap ~25 detik, rekap resmi tiap 10 menit</div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
@@ -1375,12 +1384,15 @@ html = f'''<!doctype html>
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
       <span>Hari ini</span>
     </div>
-    <div class="ping-legend">
-      <span><i class="lg-ci"></i>Diperiksa dari{f" {actions_city}" if actions_city else ""}</span>
-    </div>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
-    <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
+    <footer>
+      <div class="ping-legend">
+        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"})</span>
+        <span><i class="lg-lxc"></i>Ping lokal (real-time, ~25 detik)</span>
+      </div>
+      Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a>
+    </footer>
   </div>
   <div class="daypop" id="daypop">
     <div class="daypop-head">
@@ -1680,7 +1692,9 @@ html = f'''<!doctype html>
               var liveUp = b.status === "up";
               if (confirmedUp === liveUp) {{
                 el.className = "live-status";
-                el.textContent = "Diperbarui " + ageLabel;
+                var pingHtml = (liveUp && b.latency_ms != null)
+                  ? '<span class="ping ping-lxc">' + b.latency_ms + 'ms</span> · ' : "";
+                el.innerHTML = pingHtml + "Diperbarui " + ageLabel;
               }} else if (liveUp) {{
                 el.className = "live-status live-mismatch";
                 el.textContent = "⚠ Live check baru saja berhasil (" + ageLabel + ") — belum dikonfirmasi";
