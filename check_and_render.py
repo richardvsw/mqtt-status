@@ -841,7 +841,7 @@ for host in BROKERS:
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
             <div class="status {status_class}">{status_label}</div>
           </div>
-          <div class="live-status" data-live-host="{host}"></div>
+          <div class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
             <span>{HISTORY_DAYS} hari lalu</span>
@@ -1122,21 +1122,23 @@ html = f'''<!doctype html>
     .row-top {{ flex-wrap: wrap; }}
     .status {{ flex-basis: 100%; font-size: .78rem; }}
   }}
-  /* Live-ping detail line under the confirmed status -- see the poll
-     loop near the end of this file. A separate SECOND dot here (the
-     first design) turned out to just confuse -- two dots per row with
-     no obvious meaning -- so this is plain text instead: what the
-     live layer actually saw and how long ago, colored to match but
-     never a dot of its own. Empty/hidden until the first poll lands,
-     and falls back to a "belum ada data live" line if the last push
-     from GitHub Actions is older than LIVE_STALE_SECONDS, so it never
-     quietly shows a minutes-old ping as if it were current. */
+  /* Live-ping freshness line under the confirmed status -- see the
+     poll loop near the end of this file. First two designs (a second
+     dot, then a text line restating up/down) both just duplicated the
+     confirmed status above with no clear reason why -- confirmed
+     confusing live 2026-09-09. This version only says something NEW:
+     silent/empty until the first poll lands (no "belum ada data"
+     alarm), a quiet freshness timestamp when the live check agrees
+     with the confirmed status (the normal case), and only turns
+     amber/visible-as-a-warning when the live check just disagrees
+     with the confirmed status -- the one case that's actually useful
+     to flag (an early signal, not yet confirmed through the debounce
+     above). Falls back to empty again if the last push from GitHub
+     Actions is older than LIVE_STALE_SECONDS. */
   .live-status {{
     font-size: .72rem; color: var(--faint); margin-top: .15rem; min-height: 1em;
   }}
-  .live-status.live-up {{ color: var(--ok); }}
-  .live-status.live-down {{ color: var(--crit); }}
-  .live-status.live-auth {{ color: var(--warn); }}
+  .live-status.live-mismatch {{ color: var(--warn); font-weight: 600; }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
   .status.autherr {{ color: var(--warn); }}
@@ -1579,12 +1581,13 @@ html = f'''<!doctype html>
     // Best-effort LIVE layer -- separate from and never overrides the
     // confirmed status text above (that one only ever comes from this
     // page's own git-committed record, deliberately debounced against
-    // false-positive blips). This just polls a small endpoint on the
-    // homelab box for faster-than-10-min pings pushed there by GitHub
-    // Actions (see live_ping.py) -- if the homelab is offline, or a
-    // poll fails, or the pushed data is older than LIVE_STALE_SECONDS,
-    // every dot just goes grey/"stale" rather than showing anything
-    // it's not confident is current.
+    // false-positive blips). Polls a small endpoint on the homelab box
+    // for faster-than-10-min pings pushed there by GitHub Actions (see
+    // live_ping.py). Only ever shows something the confirmed status
+    // above didn't already say -- a quiet freshness timestamp when
+    // they agree (the normal case), or an amber early-warning line
+    // when the live check just disagrees with the confirmed status.
+    // Silent (not "no data") whenever there's nothing worth saying yet.
     (function () {{
       var LIVE_URL = "https://meshbot.rivi.my.id/api/public/broker-status";
       var POLL_MS = 20000;
@@ -1594,10 +1597,10 @@ html = f'''<!doctype html>
         timeout: "Timeout", mqtt_rejected: "Ditolak broker", down: "Down"
       }};
 
-      function setAllStale() {{
+      function clearAll() {{
         document.querySelectorAll(".live-status").forEach(function (el) {{
           el.className = "live-status";
-          el.textContent = "Live: belum ada data terkini";
+          el.textContent = "";
         }});
       }}
 
@@ -1606,24 +1609,32 @@ html = f'''<!doctype html>
           .then(function (r) {{ return r.ok ? r.json() : Promise.reject(r.status); }})
           .then(function (data) {{
             var age = data.checked_at ? (Date.now() / 1000 - data.checked_at) : Infinity;
-            if (age > LIVE_STALE_SECONDS) {{ setAllStale(); return; }}
+            if (age > LIVE_STALE_SECONDS) {{ clearAll(); return; }}
             var ageLabel = age < 60 ? Math.round(age) + "dtk lalu" : Math.round(age / 60) + "m lalu";
             document.querySelectorAll("[data-live-host]").forEach(function (el) {{
               var b = (data.brokers || {{}})[el.dataset.liveHost];
-              if (!b) {{ el.className = "live-status"; el.textContent = "Live: belum ada data"; return; }}
-              if (b.status === "up") {{
-                el.className = "live-status live-up";
-                el.textContent = "Live: Aktif" + (b.latency_ms != null ? " · " + b.latency_ms + "ms" : "") + " (" + ageLabel + ")";
-              }} else if (b.status === "auth_error") {{
-                el.className = "live-status live-auth";
-                el.textContent = "Live: Autentikasi Ditolak (" + ageLabel + ")";
+              if (!b) {{ el.className = "live-status"; el.textContent = ""; return; }}
+              // Confirmed status classes are "up" / "down" / "autherr" --
+              // live status is "up" / "down" / "auth_error", so treat
+              // anything non-"up" on either side as the same "not up"
+              // bucket for the agree/disagree comparison.
+              var confirmed = el.dataset.confirmed;
+              var confirmedUp = confirmed === "up";
+              var liveUp = b.status === "up";
+              if (confirmedUp === liveUp) {{
+                el.className = "live-status";
+                el.textContent = "Diperbarui " + ageLabel;
+              }} else if (liveUp) {{
+                el.className = "live-status live-mismatch";
+                el.textContent = "⚠ Live check baru saja berhasil (" + ageLabel + ") — belum dikonfirmasi";
               }} else {{
-                el.className = "live-status live-down";
-                el.textContent = "Live: " + (REASON_LABEL[b.reason] || "Down") + " (" + ageLabel + ")";
+                var reasonText = b.status === "auth_error" ? "Autentikasi ditolak" : (REASON_LABEL[b.reason] || "Down");
+                el.className = "live-status live-mismatch";
+                el.textContent = "⚠ Live check baru saja gagal: " + reasonText + " (" + ageLabel + ") — belum dikonfirmasi";
               }}
             }});
           }})
-          .catch(setAllStale);
+          .catch(clearAll);
       }}
 
       poll();
