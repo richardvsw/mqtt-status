@@ -113,6 +113,21 @@ CHECK_RETRIES = 10
 RETRY_DELAY_SECONDS = 1.5
 
 
+def _classify_connect_error(exc):
+    """Buckets a connect-time exception into a specific, displayable
+    reason instead of the single generic "down" every failure used to
+    collapse into -- confirmed 2026-09-09: a DNS-only outage (domain not
+    resolving, broker itself fine) rendered identically to a genuinely
+    dead broker, giving no hint which end actually needed fixing."""
+    if isinstance(exc, socket.gaierror):
+        return "dns_error"
+    if isinstance(exc, ConnectionRefusedError):
+        return "refused"
+    if isinstance(exc, (socket.timeout, TimeoutError)):
+        return "timeout"
+    return "down"
+
+
 def _mqtt_connect_attempt(host, timeout):
     """One real MQTT CONNECT (not just a TCP handshake). Returns "up",
     "auth_error", or "down". Falls back to a plain TCP check when no
@@ -121,11 +136,11 @@ def _mqtt_connect_attempt(host, timeout):
     if not MQTT_CHECK_USER:
         try:
             with socket.create_connection((host, MQTT_PORT), timeout=timeout):
-                return "up"
-        except Exception:
-            return "down"
+                return "up", None
+        except Exception as e:
+            return "down", _classify_connect_error(e)
 
-    result = {"status": None}
+    result = {"status": None, "reason": None}
 
     def on_connect(client, userdata, flags, rc, properties=None):
         code = rc.value if hasattr(rc, "value") else rc
@@ -134,7 +149,12 @@ def _mqtt_connect_attempt(host, timeout):
         elif code in (4, 5):  # bad username/password, not authorised
             result["status"] = "auth_error"
         else:
+            # Broker itself answered the CONNECT and actively rejected the
+            # session (bad protocol version, identifier rejected, server
+            # unavailable) -- distinct from never reaching the broker at
+            # all, so worth its own reason instead of folding into "down".
             result["status"] = "down"
+            result["reason"] = "mqtt_rejected"
         client.disconnect()
 
     # paho-mqtt 2.x defaults to the VERSION2 callback API, whose
@@ -161,9 +181,9 @@ def _mqtt_connect_attempt(host, timeout):
             client.disconnect()
         except Exception:
             pass
-    except Exception:
-        return "down"
-    return result["status"] or "down"
+    except Exception as e:
+        return "down", _classify_connect_error(e)
+    return (result["status"] or "down"), result["reason"]
 
 
 def check_broker(host, timeout=5, retries=CHECK_RETRIES):
@@ -176,22 +196,30 @@ def check_broker(host, timeout=5, retries=CHECK_RETRIES):
     page; a genuinely down broker still fails every attempt and gets
     marked down same as before, just slower to confirm.
 
-    Returns (status, latency_ms) where status is "up", "auth_error", or
-    "down". auth_error does not retry through the full loop the way "down"
-    does -- a rejected login is a deterministic result, not a transient
-    network blip, so retrying it just burns time for the same answer."""
+    Returns (status, latency_ms, reason) where status is "up",
+    "auth_error", or "down", and reason is one of "dns_error", "refused",
+    "timeout", "mqtt_rejected", "down" (unclassified) when status is
+    "down", else None. auth_error does not retry through the full loop
+    the way "down" does -- a rejected login is a deterministic result,
+    not a transient network blip, so retrying it just burns time for the
+    same answer. The reason kept across retries is from the LAST attempt
+    -- if every attempt fails the same way that's just confirmation, but
+    if it flips (e.g. dns_error then timeout) the most recent attempt is
+    the more representative snapshot of what's currently wrong."""
     t0 = time.time()
     last_status = "down"
+    last_reason = "down"
     for attempt in range(retries):
-        status = _mqtt_connect_attempt(host, timeout)
+        status, reason = _mqtt_connect_attempt(host, timeout)
         if status == "up":
-            return "up", round((time.time() - t0) * 1000)
+            return "up", round((time.time() - t0) * 1000), None
         if status == "auth_error":
-            return "auth_error", None
+            return "auth_error", None, None
         last_status = status
+        last_reason = reason or "down"
         if attempt < retries - 1:
             time.sleep(RETRY_DELAY_SECONDS)
-    return last_status, None
+    return last_status, None, last_reason
 
 
 def load_json(path, default):
@@ -288,11 +316,12 @@ if bot_long_name:
 
 brokers = {}
 for host in BROKERS:
-    raw_status, latency_ms = check_broker(host)  # "up" / "auth_error" / "down"
+    raw_status, latency_ms, raw_reason = check_broker(host)  # "up" / "auth_error" / "down"
     raw_reachable = raw_status == "up"
     st = state.setdefault(host, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
     st.setdefault("consecutive_fails", 0)
     st.setdefault("provisional_start", None)
+    st.setdefault("down_reason", None)
     # Auth-error tracking mirrors the down-tracking fields above exactly,
     # just under its own keys, so the two failure modes get independent
     # confirm-threshold debouncing and independent displayed durations
@@ -308,6 +337,7 @@ for host in BROKERS:
         st["consecutive_auth_fails"] = 0
         st["provisional_auth_start"] = None
         st["current_auth_start"] = None
+        st["down_reason"] = None
     elif raw_status == "auth_error":
         # Not a network outage -- don't touch the down-tracking fields.
         st["consecutive_fails"] = 0
@@ -325,6 +355,11 @@ for host in BROKERS:
         st["provisional_auth_start"] = None
         st["current_auth_start"] = None
         st["consecutive_fails"] += 1
+        # Always the latest attempt's reason, even before the outage is
+        # confirmed -- so the very first "Down" render already carries a
+        # specific reason instead of a generic one for the first
+        # CONFIRM_THRESHOLD runs.
+        st["down_reason"] = raw_reason
         if st["provisional_start"] is None:
             st["provisional_start"] = now
         if st["consecutive_fails"] >= CONFIRM_THRESHOLD:
@@ -363,6 +398,7 @@ for host in BROKERS:
         "actions_latency_ms": st.get("actions_latency_ms"),
         "current_outage_start": st["current_outage_start"],
         "current_auth_start": st["current_auth_start"],
+        "down_reason": st.get("down_reason") if confirmed_down else None,
     }
 
 save_json(STATE_PATH, state)
@@ -515,6 +551,17 @@ for _host, _incs in REAL_INCIDENTS.items():
     if _incs and _incs[-1]["end"] is None:
         _OPEN_INCIDENT_START[(_host, _incs[-1]["kind"])] = _incs[-1]["start"]
 KIND_LABEL = {"down": "Down", "autherr": "Autentikasi Ditolak"}
+
+# Specific down-family reasons -- see _classify_connect_error(). "down"
+# itself is the unclassified fallback, kept generic on purpose since it
+# covers whatever exception shape wasn't worth a dedicated bucket.
+DOWN_REASON_LABEL = {
+    "dns_error": "DNS Gagal Resolve",
+    "refused": "Koneksi Ditolak",
+    "timeout": "Timeout",
+    "mqtt_rejected": "Ditolak Broker",
+    "down": "Down",
+}
 
 
 BOT_ENTITIES = ["mesh_bot", "meshtasticd", "lxc-monitor"]
@@ -758,7 +805,8 @@ for host in BROKERS:
     else:
         _start = _OPEN_INCIDENT_START.get((host, "down"), b["current_outage_start"])
         dur = fmt_duration(now - _start) if _start else "?"
-        status_label, status_class = f"Down · {dur}", "down"
+        reason_label = DOWN_REASON_LABEL.get(b["down_reason"], "Down")
+        status_label, status_class = f"{reason_label} · {dur}", "down"
         down_hosts.append(host)
     uptime_pct = host_uptime_pct(host)
     uptime_label = f"{uptime_pct:.2f} % uptime" if uptime_pct is not None else "belum ada data"
