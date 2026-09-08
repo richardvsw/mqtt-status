@@ -88,7 +88,18 @@ SERVICES = ["mesh_bot", "meshtasticd"]
 SERVICE_LABEL = {
     "mesh_bot": "mesh_bot.service",
     "meshtasticd": "meshtasticd.service",
+    "bot": "Bot",
 }
+# 2026-09-09: mesh_bot.service vs meshtasticd.service is an internal
+# implementation detail (mesh_bot is our own Python process, meshtasticd
+# is the separate daemon it talks to over a local API) -- a visitor to
+# this public page has no way to know what either one does or which one
+# they should care about, so the page now shows ONE combined row instead
+# of two unexplained service names. Both underlying checks still run and
+# still get logged (see the "bot" entry derived from them below) so a
+# problem is still fully diagnosable from bot_log.jsonl/bot_state.json,
+# just not exposed as two separate public-facing rows anymore.
+DISPLAY_SERVICES = ["bot"]
 
 # 2026-09-04: replaces the old two-sided design (a local LXC check that
 # git-committed its results, plus a GitHub-Actions-side "has the LXC
@@ -170,6 +181,16 @@ except Exception as e:
     print(f"public status API unreachable, reporting down: {e}")
     checks["mesh_bot"] = "down"
     checks["meshtasticd"] = "down"
+
+# The one row the public page actually shows -- "up" only when BOTH
+# underlying checks are up, same all-or-nothing standard a visitor
+# would apply themselves if asked "is the bot working". Runs through
+# the exact same confirm-threshold/history/incident-tracking pipeline
+# as mesh_bot/meshtasticd below (it's just another key in `checks`),
+# so its own uptime %, incident log, and calendar are all real,
+# independently-tracked data for "bot", not a display-only merge of
+# the other two.
+checks["bot"] = "up" if checks["mesh_bot"] == "up" and checks["meshtasticd"] == "up" else "down"
 
 for svc, status in checks.items():
     st = state.setdefault(svc, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
@@ -416,7 +437,7 @@ def day_bar_html(svc):
 rows = []
 up_count = 0
 down_svcs = []
-for svc in SERVICES:
+for svc in DISPLAY_SERVICES:
     st = state.get(svc, {})
     down = st.get("current_outage_start") is not None
     if not down:
@@ -432,11 +453,20 @@ for svc in SERVICES:
     uptime_pct = host_uptime_pct(svc)
     uptime_label = f"{uptime_pct:.2f} % uptime" if uptime_pct is not None else "belum ada data"
     extra = ""
-    if svc == "mesh_bot" and meta.get("last_reply_ts"):
+    if svc == "bot" and meta.get("last_reply_ts"):
         ago = fmt_duration(now - meta["last_reply_ts"])
         extra = f'<div class="row-extra">Balasan terakhir: {ago} lalu</div>'
-    if svc == "mesh_bot" and meta.get("restart_count") is not None:
+    if svc == "bot" and meta.get("restart_count") is not None:
         extra += f'<div class="row-extra">Restart tercatat: {meta["restart_count"]}x</div>'
+    # Down cause: still worth surfacing WHICH underlying check is
+    # failing (mesh_bot vs meshtasticd) even though they're no longer
+    # separate public rows -- otherwise a real problem becomes totally
+    # opaque ("Bot: Down", no further info) instead of just less
+    # cluttered on the happy path.
+    if svc == "bot" and down:
+        _causes = [SERVICE_LABEL[s] for s in ("mesh_bot", "meshtasticd") if checks.get(s) != "up"]
+        if _causes:
+            extra += f'<div class="row-extra">Penyebab: {", ".join(_causes)}</div>'
     rows.append(f'''
         <div class="row">
           <div class="row-top">
@@ -454,7 +484,7 @@ for svc in SERVICES:
           </div>
         </div>''')
 
-total = len(SERVICES)
+total = len(DISPLAY_SERVICES)
 if up_count == total:
     banner_class, banner_text, banner_icon = "ok", "Semua Layanan Bot Normal", "✓"
 elif up_count == 0:
@@ -493,19 +523,48 @@ def _event_row_time(ts):
 
 
 def _event_log_html():
+    # 2026-09-09: a bad stretch (flapping interface, repeated watchdog
+    # restarts) made this a long flat wall of rows -- same problem
+    # check_and_render.py's own incident log had, fixed the same way:
+    # group by day, collapse each day to one summary line via native
+    # <details>/<summary> (no JS, keyboard-accessible for free), all
+    # closed by default so the page stays compact until a day is
+    # actually clicked open.
     events = _load_bot_events()
     if not events:
         return '<p class="note">Belum ada kejadian tercatat.</p>'
-    rows_html = "".join(
-        f'''<div class="event-row">
+    by_day = {}
+    day_order = []
+    for e in events:
+        d = datetime.fromtimestamp(e["ts"], WIB).strftime("%Y-%m-%d")
+        if d not in by_day:
+            by_day[d] = []
+            day_order.append(d)
+        by_day[d].append(e)
+    blocks = []
+    for d in day_order:
+        day_events = by_day[d]
+        rows_html = "".join(
+            f'''<div class="event-row">
           <div class="event-time">{_event_row_time(e["ts"])}</div>
           <div class="event-body"><div class="event-title">{e.get("title", "")}</div><div class="event-msg">{e.get("message", "")}</div></div>
         </div>'''
-        for e in events
-    )
+            for e in day_events
+        )
+        n = len(day_events)
+        summary_text = f"{n} kejadian" if n != 1 else "1 kejadian"
+        blocks.append(f'''
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">{d}</span>
+            <span class="event-day-count">{summary_text}</span>
+          </summary>
+          <div class="event-day-rows">{rows_html}</div>
+        </details>''')
     return f'''
     <h2 class="section-title">Riwayat Kejadian</h2>
-    <div class="event-log">{rows_html}</div>'''
+    <div class="event-log">{"".join(blocks)}</div>'''
 
 html = f'''<!doctype html>
 <html lang="id">
@@ -522,7 +581,7 @@ html = f'''<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Status Bot — RiV-meshBot</title>
-<meta name="description" content="Status langsung layanan RiV-meshBot (mesh_bot, meshtasticd)">
+<meta name="description" content="Status langsung layanan RiV-meshBot">
 <script>
   setTimeout(function () {{
     location.replace(location.pathname + "?_=" + Date.now());
@@ -650,6 +709,18 @@ html = f'''<!doctype html>
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
   .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
   .event-log {{ background: var(--surf); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); overflow: hidden; }}
+  .event-day {{ border-bottom: 1px solid var(--border-soft); }}
+  .event-day:last-child {{ border-bottom: none; }}
+  .event-day[open] > .event-day-summary .event-day-chevron {{ transform: rotate(90deg); }}
+  .event-day-summary {{
+    display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
+    cursor: pointer; list-style: none; user-select: none;
+  }}
+  .event-day-summary::-webkit-details-marker {{ display: none; }}
+  .event-day-summary:hover {{ background: var(--border-soft); }}
+  .event-day-chevron {{ color: var(--faint); font-size: .7rem; transition: transform .12s; flex-shrink: 0; }}
+  .event-day-date {{ font-weight: 600; font-size: .82rem; }}
+  .event-day-count {{ color: var(--faint); font-size: .76rem; margin-left: auto; }}
   .event-row {{ display: flex; gap: .9rem; padding: .8rem 1.1rem; border-top: 1px solid var(--border-soft); }}
   .event-row:first-child {{ border-top: none; }}
   .event-time {{ flex-shrink: 0; width: 6.5rem; color: var(--faint); font-size: .72rem; font-variant-numeric: tabular-nums; padding-top: .1rem; }}

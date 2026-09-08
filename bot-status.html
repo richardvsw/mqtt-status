@@ -13,7 +13,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Status Bot — RiV-meshBot</title>
-<meta name="description" content="Status langsung layanan RiV-meshBot (mesh_bot, meshtasticd)">
+<meta name="description" content="Status langsung layanan RiV-meshBot">
 <script>
   setTimeout(function () {
     location.replace(location.pathname + "?_=" + Date.now());
@@ -141,6 +141,18 @@
   .note { color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }
   .section-title { font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }
   .event-log { background: var(--surf); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); overflow: hidden; }
+  .event-day { border-bottom: 1px solid var(--border-soft); }
+  .event-day:last-child { border-bottom: none; }
+  .event-day[open] > .event-day-summary .event-day-chevron { transform: rotate(90deg); }
+  .event-day-summary {
+    display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
+    cursor: pointer; list-style: none; user-select: none;
+  }
+  .event-day-summary::-webkit-details-marker { display: none; }
+  .event-day-summary:hover { background: var(--border-soft); }
+  .event-day-chevron { color: var(--faint); font-size: .7rem; transition: transform .12s; flex-shrink: 0; }
+  .event-day-date { font-weight: 600; font-size: .82rem; }
+  .event-day-count { color: var(--faint); font-size: .76rem; margin-left: auto; }
   .event-row { display: flex; gap: .9rem; padding: .8rem 1.1rem; border-top: 1px solid var(--border-soft); }
   .event-row:first-child { border-top: none; }
   .event-time { flex-shrink: 0; width: 6.5rem; color: var(--faint); font-size: .72rem; font-variant-numeric: tabular-nums; padding-top: .1rem; }
@@ -187,7 +199,7 @@
       <h1>Status Bot — RiV-meshBot</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
-    <div class="sub"><b>2/2</b> layanan normal</div>
+    <div class="sub"><b>1/1</b> layanan normal</div>
     <p class="note">Bot menggunakan <b>mqtt.rivi.my.id</b>, otomatis memilih broker yang sehat (DNS failover)<button class="info-btn" id="dnsInfoBtn" aria-label="Cara kerja DNS failover" title="Cara kerja DNS failover">?</button>. Saat ini terkoneksi ke: <b>mqtt.meshnode.id</b>.</p>
     <div class="info-modal-backdrop" id="dnsInfoBackdrop">
       <div class="info-modal">
@@ -208,40 +220,40 @@
     <div class="panel">
         <div class="row">
           <div class="row-top">
-            <div class="row-left"><span class="dot up"></span><span class="host">mesh_bot.service</span></div>
+            <div class="row-left"><span class="dot up"></span><span class="host">Bot</span></div>
             <div class="status up">Aktif</div>
           </div>
-          <div class="row-extra">Balasan terakhir: 47m lalu</div><div class="row-extra">Restart tercatat: 0x</div>
-          <div class="bars"><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-22" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-23" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#80af2a" data-date="2026-08-24" data-status="up" data-pct="100" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 114.83165955543518, &quot;start_clock&quot;: &quot;21:30&quot;, &quot;end_clock&quot;: &quot;21:32&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-25" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#daa92a" data-date="2026-08-26" data-status="warn" data-pct="96" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 2908.5449664592743, &quot;start_clock&quot;: &quot;18:19&quot;, &quot;end_clock&quot;: &quot;19:08&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-27" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-28" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-29" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-30" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-31" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-01" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-02" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#8ab12a" data-date="2026-09-03" data-status="up" data-pct="100" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 119.96139907836914, &quot;start_clock&quot;: &quot;12:34&quot;, &quot;end_clock&quot;: &quot;12:36&quot;}, {&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 120.8864893913269, &quot;start_clock&quot;: &quot;22:14&quot;, &quot;end_clock&quot;: &quot;22:16&quot;}]"></div><div class="bar" style="background:#85b02a" data-date="2026-09-04" data-status="up" data-pct="100" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 544.4396696090698, &quot;start_clock&quot;: &quot;18:51&quot;, &quot;end_clock&quot;: &quot;19:00&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-05" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#a5b22a" data-date="2026-09-06" data-status="warn" data-pct="99" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 523.468382358551, &quot;start_clock&quot;: &quot;06:01&quot;, &quot;end_clock&quot;: &quot;06:10&quot;}]"></div><div class="bar" style="background:#e2a82a" data-date="2026-09-07" data-status="warn" data-pct="92" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 600.5624563694, &quot;start_clock&quot;: &quot;05:40&quot;, &quot;end_clock&quot;: &quot;05:50&quot;}, {&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 591.228173494339, &quot;start_clock&quot;: &quot;07:00&quot;, &quot;end_clock&quot;: &quot;07:10&quot;}, {&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 5399.82220864296, &quot;start_clock&quot;: &quot;09:20&quot;, &quot;end_clock&quot;: &quot;10:50&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-08" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-09" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
+          <div class="row-extra">Balasan terakhir: 51m lalu</div><div class="row-extra">Restart tercatat: 0x</div>
+          <div class="bars"><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-22" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-23" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-24" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-25" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-26" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-27" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-28" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-29" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-30" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-31" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-01" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-02" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-03" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-04" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-05" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-06" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-07" data-status="nodata"></div><div class="bar nodata" data-date="2026-09-08" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-09" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
           <div class="bars-caption row-caption">
             <span>30 hari lalu</span>
             <span class="caption-line"></span>
-            <span>99.58 % uptime</span>
-            <span class="caption-line"></span>
-            <span>Hari ini</span>
-          </div>
-        </div>
-        <div class="row">
-          <div class="row-top">
-            <div class="row-left"><span class="dot up"></span><span class="host">meshtasticd.service</span></div>
-            <div class="status up">Aktif</div>
-          </div>
-          
-          <div class="bars"><div class="bar nodata" data-date="2026-08-11" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-12" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-13" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-14" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-15" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-16" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-17" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-18" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-19" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-20" data-status="nodata"></div><div class="bar nodata" data-date="2026-08-21" data-status="nodata"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-22" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-23" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-24" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-25" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-26" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-27" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-28" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-29" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-30" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-08-31" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-01" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-02" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-03" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#85b02a" data-date="2026-09-04" data-status="up" data-pct="100" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 544.4396696090698, &quot;start_clock&quot;: &quot;18:51&quot;, &quot;end_clock&quot;: &quot;19:00&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-05" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#a5b22a" data-date="2026-09-06" data-status="warn" data-pct="99" data-today="0" data-incidents="[{&quot;kind&quot;: &quot;down&quot;, &quot;label&quot;: &quot;Down&quot;, &quot;seconds&quot;: 523.468382358551, &quot;start_clock&quot;: &quot;06:01&quot;, &quot;end_clock&quot;: &quot;06:10&quot;}]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-07" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-08" data-status="up" data-pct="100" data-today="0" data-incidents="[]"></div><div class="bar" style="background:#76ad2a" data-date="2026-09-09" data-status="up" data-pct="100" data-today="1" data-incidents="[]"></div></div>
-          <div class="bars-caption row-caption">
-            <span>30 hari lalu</span>
-            <span class="caption-line"></span>
-            <span>99.98 % uptime</span>
+            <span>100.00 % uptime</span>
             <span class="caption-line"></span>
             <span>Hari ini</span>
           </div>
         </div></div>
     
     <h2 class="section-title">Riwayat Kejadian</h2>
-    <div class="event-log"><div class="event-row">
+    <div class="event-log">
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-09-08</span>
+            <span class="event-day-count">1 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">08 Sep, 19:23 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot reconnected</div><div class="event-msg">meshtasticd restarted while mesh_bot was still running through it -- restarted mesh_bot to avoid a stale connection silently missing messages.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-09-07</span>
+            <span class="event-day-count">12 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">07 Sep, 19:02 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">4 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
         </div><div class="event-row">
@@ -277,7 +289,15 @@
         </div><div class="event-row">
           <div class="event-time">07 Sep, 03:10 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">3 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-09-06</span>
+            <span class="event-day-count">3 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">06 Sep, 03:15 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">4 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
         </div><div class="event-row">
@@ -286,7 +306,15 @@
         </div><div class="event-row">
           <div class="event-time">06 Sep, 02:37 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: bot restarted</div><div class="event-msg">Known command unanswered for 11 min — watchdog restarted mesh_bot.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-09-04</span>
+            <span class="event-day-count">5 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">04 Sep, 15:59 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">3 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
         </div><div class="event-row">
@@ -301,7 +329,15 @@
         </div><div class="event-row">
           <div class="event-time">04 Sep, 15:02 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">3 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-09-03</span>
+            <span class="event-day-count">6 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">03 Sep, 22:06 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">6 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
         </div><div class="event-row">
@@ -319,7 +355,15 @@
         </div><div class="event-row">
           <div class="event-time">03 Sep, 06:40 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">3 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-08-29</span>
+            <span class="event-day-count">6 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">29 Agu, 23:42 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">4 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
         </div><div class="event-row">
@@ -337,7 +381,15 @@
         </div><div class="event-row">
           <div class="event-time">29 Agu, 20:02 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: mesh_bot restarted (interface flap)</div><div class="event-msg">3 interface disconnect/reconnect events in the last 15 min — watchdog restarted mesh_bot.</div></div>
-        </div><div class="event-row">
+        </div></div>
+        </details>
+        <details class="event-day">
+          <summary class="event-day-summary">
+            <span class="event-day-chevron">▸</span>
+            <span class="event-day-date">2026-08-26</span>
+            <span class="event-day-count">3 kejadian</span>
+          </summary>
+          <div class="event-day-rows"><div class="event-row">
           <div class="event-time">26 Agu, 17:36 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: rivbot-ui restarted</div><div class="event-msg">MQTT still silent after restarting meshtasticd — watchdog restarted rivbot-ui's own MQTT connection instead.</div></div>
         </div><div class="event-row">
@@ -347,7 +399,8 @@
           <div class="event-time">26 Agu, 17:33 WIB</div>
           <div class="event-body"><div class="event-title">RiV-meshBot: meshtasticd restarted</div><div class="event-msg">MQTT silent for 45 min — watchdog restarted meshtasticd.</div></div>
         </div></div>
-    <footer>Diperbarui 09 Sep 2026, 02:20:22 WIB · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
+        </details></div>
+    <footer>Diperbarui 09 Sep 2026, 02:24:34 WIB · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
   <div class="daypop" id="daypop">
     <div class="daypop-head">
