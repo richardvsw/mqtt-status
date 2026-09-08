@@ -735,9 +735,7 @@ def day_bar_html(host):
 # phrase on every single row -- keeps rows to one line instead of
 # wrapping, full explanation lives once in the footnote instead of
 # repeated 5x on the page.
-lxc_city = (meta.get("lxc_location") or "").split(",")[0]
 actions_city = (meta.get("actions_location") or "").split(",")[0]
-bot_display_name = meta.get("lxc_bot_name") or "RiV-meshBot"
 
 rows = []
 up_count = 0
@@ -751,12 +749,7 @@ for host in BROKERS:
         # Color-coded instead of repeating "(city name)" text on every
         # row -- legend explaining what each color means lives once,
         # below the panel (see .ping-legend).
-        parts = []
-        if b["lxc_latency_ms"] is not None:
-            parts.append(f'<span class="ping ping-lxc">{b["lxc_latency_ms"]}ms</span>')
-        if b["actions_latency_ms"] is not None:
-            parts.append(f'<span class="ping ping-ci">{b["actions_latency_ms"]}ms</span>')
-        status_label = "Aktif · " + " · ".join(parts) if parts else "Aktif"
+        status_label = "Aktif"
     elif b["auth_error"]:
         _start = _OPEN_INCIDENT_START.get((host, "autherr"), b["current_auth_start"])
         dur = fmt_duration(now - _start) if _start else "?"
@@ -1235,10 +1228,8 @@ html = f'''<!doctype html>
       <span>Hari ini</span>
     </div>
     <div class="ping-legend">
-      <span><i class="lg-lxc"></i>{bot_display_name}{f" ({lxc_city})" if lxc_city else ""}</span>
-      <span><i class="lg-ci"></i>GitHub Actions{f" ({actions_city})" if actions_city else ""}</span>
+      <span><i class="lg-ci"></i>Diperiksa dari{f" {actions_city}" if actions_city else ""}</span>
     </div>
-    <p class="note">Ping cadangan wajar lebih tinggi karena jaraknya — bukan tanda broker lambat.</p>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
