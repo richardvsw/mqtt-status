@@ -903,9 +903,8 @@ for host in BROKERS:
         <div class="row">
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
-            <div class="status {status_class}">{status_label}</div>
+            <div class="status {status_class}">{status_label}<span class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></span></div>
           </div>
-          <div class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
             <span>{HISTORY_DAYS} hari lalu</span>
@@ -1199,10 +1198,16 @@ html = f'''<!doctype html>
      to flag (an early signal, not yet confirmed through the debounce
      above). Falls back to empty again if the last push from GitHub
      Actions is older than LIVE_STALE_SECONDS. */
-  .live-status {{
-    font-size: .72rem; color: var(--faint); margin-top: .15rem; min-height: 1em;
+  /* Inline by default (right next to the confirmed "Aktif · Xms" text
+     -- 2026-09-09, moved off its own line so the two ping sources sit
+     side by side on one row instead of stacked). Only the mismatch
+     warning (a full sentence, doesn't fit inline) drops to its own
+     line below. */
+  .live-status {{ font-size: .72rem; color: var(--faint); margin-left: .5rem; }}
+  .live-status:empty {{ margin-left: 0; }}
+  .live-status.live-mismatch {{
+    display: block; margin-left: 0; margin-top: .3rem; color: var(--warn); font-weight: 600;
   }}
-  .live-status.live-mismatch {{ color: var(--warn); font-weight: 600; }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
   .status.autherr {{ color: var(--warn); }}
@@ -1212,13 +1217,11 @@ html = f'''<!doctype html>
   .ping {{ font-variant-numeric: tabular-nums; font-weight: 600; }}
   .ping-lxc {{ color: var(--ok); }}
   .ping-ci {{ color: var(--accent); }}
-  /* Single global freshness summary (replaces a "Diperbarui X lalu" line
-     repeated on every one of the 6 rows below -- 2026-09-09, confirmed
-     confusing/redundant to show the same two clocks six times over).
-     Ticks every second client-side, same pattern as #live-clock. */
-  .ping-summary {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1rem; font-size: .78rem; margin: .3rem 0 .6rem; }}
-  .ping-summary .src-ci {{ color: var(--accent); }}
-  .ping-summary .src-lxc {{ color: var(--ok); }}
+  /* Ticking freshness ("diperbarui X lalu") lives inline in the footer
+     legend below, right next to what each color means -- 2026-09-09,
+     moved off its own line at the top (confirmed cluttered/overlapping
+     the nav links) and consolidated from a per-row repeat down to
+     once, ticking every second client-side like #live-clock. */
   .ping-legend {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.2rem; margin-bottom: .6rem; font-size: .74rem; color: var(--faint); }}
   .ping-legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .ping-legend i {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
@@ -1384,10 +1387,6 @@ html = f'''<!doctype html>
       </button>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
-    <div class="ping-summary">
-      <span class="src-ci" id="actions-ping-summary">Ping GitHub Actions • memuat...</span>
-      <span class="src-lxc" id="local-ping-summary">Ping lokal • memuat...</span>
-    </div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
@@ -1399,8 +1398,8 @@ html = f'''<!doctype html>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>
       <div class="ping-legend">
-        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"})</span>
-        <span><i class="lg-lxc"></i>Ping lokal (real-time, ~25 detik)</span>
+        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"}) • <span id="actions-ping-summary">memuat...</span></span>
+        <span><i class="lg-lxc"></i>Ping lokal (real-time, ~25 detik) • <span id="local-ping-summary">memuat...</span></span>
       </div>
       Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a>
     </footer>
@@ -1669,12 +1668,15 @@ html = f'''<!doctype html>
     // on all 6 rows -- confirmed redundant, since it's the same two
     // clocks (this page's own generation time, and the local loop's
     // last check) six times over. Now shown ONCE, ticking every second
-    // like #live-clock, in #actions-ping-summary/#local-ping-summary
-    // near the top. Each row's own .live-status line is now reserved
-    // for the one thing that IS genuinely per-broker: an amber warning
-    // when that broker's live check disagrees with its confirmed
-    // status -- silent otherwise (just the local ping ms, matching how
-    // the confirmed "Aktif · Xms" line above already works).
+    // like #live-clock, inline in the footer legend
+    // (#actions-ping-summary/#local-ping-summary) -- a separate block
+    // near the top was tried first and confirmed to overlap/clutter the
+    // nav links, so it moved down next to the legend it already
+    // explains. Each row's own inline .live-status span is now reserved
+    // for two things: the local ping ms sitting right next to the
+    // confirmed "Aktif · Xms" (side by side, not stacked), and an amber
+    // warning (its own line, doesn't fit inline) when that broker's
+    // live check disagrees with its confirmed status.
     (function () {{
       var LIVE_URL = "https://meshbot.rivi.my.id/api/public/broker-status";
       var POLL_MS = 20000;
@@ -1700,13 +1702,13 @@ html = f'''<!doctype html>
       function tickSummaries() {{
         var actionsEl = document.getElementById("actions-ping-summary");
         if (actionsEl) {{
-          actionsEl.textContent = "Ping GitHub Actions • diperbarui " + fmtAge(Date.now() / 1000 - PAGE_GENERATED_AT);
+          actionsEl.textContent = "diperbarui " + fmtAge(Date.now() / 1000 - PAGE_GENERATED_AT);
         }}
         var localEl = document.getElementById("local-ping-summary");
         if (localEl) {{
           localEl.textContent = localHasData
-            ? "Ping lokal • diperbarui " + fmtAge(Date.now() / 1000 - localCheckedAt)
-            : "Ping lokal • tidak ada data terkini";
+            ? "diperbarui " + fmtAge(Date.now() / 1000 - localCheckedAt)
+            : "tidak ada data terkini";
         }}
       }}
 
