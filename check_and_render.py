@@ -20,6 +20,7 @@ import json
 import os
 import socket
 import time
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 # GitHub Actions sets this on every runner automatically -- no config
@@ -402,6 +403,38 @@ for host in BROKERS:
     }
 
 save_json(STATE_PATH, state)
+
+
+# 2026-09-09: informational-only comparison against CT104's own live
+# broker-check loop (public_site.py's /api/public/broker-status,
+# checking every ~25s directly from the homelab -- see that file's own
+# docstring for why it's allowed to, unlike this repo's own checks
+# which only ever run from GitHub Actions). This NEVER feeds back into
+# `brokers`/`state` above -- this run's own check, just completed, stays
+# the sole source of truth for the committed record. Purely a "does the
+# fast homelab-side view roughly agree with what we just found" log
+# line, useful for noticing if the two views drift apart (e.g. the
+# homelab's fast check flags something this run's single sample missed,
+# or vice versa) without letting an unverified external source ever
+# override the debounced, git-committed status.
+try:
+    with urllib.request.urlopen("https://meshbot.rivi.my.id/api/public/broker-status", timeout=8) as resp:
+        _live = json.load(resp)
+    _live_age = time.time() - _live.get("checked_at", 0) if _live.get("checked_at") else None
+    if _live_age is not None and _live_age < 300:
+        for host, b in brokers.items():
+            _lb = (_live.get("brokers") or {}).get(host)
+            if not _lb:
+                continue
+            _live_up = _lb.get("status") == "up"
+            if _live_up != b["raw_reachable"]:
+                print(f"live-compare: {host} disagrees -- this run: "
+                      f"{'up' if b['raw_reachable'] else 'down'}, CT104 live: "
+                      f"{_lb.get('status')} ({_live_age:.0f}s old)")
+    else:
+        print("live-compare: CT104 live data missing or stale, skipping comparison")
+except Exception as e:
+    print(f"live-compare: fetch failed, skipping comparison: {e}")
 
 today_str = datetime.fromtimestamp(now, WIB).strftime("%Y-%m-%d")
 today_bucket = history.setdefault(today_str, {})

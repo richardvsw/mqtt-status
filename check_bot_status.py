@@ -59,6 +59,15 @@ SERVICE_LABEL = {
     "meshtasticd": "meshtasticd.service",
     "bot": "Bot",
 }
+# 2026-09-09: plain-language cause text for the "Penyebab" line below --
+# SERVICE_LABEL's own names (mesh_bot.service/meshtasticd.service) are
+# internal process names with no meaning to a visitor. This describes
+# what each one actually failing MEANS in practice, in Bahasa
+# Indonesia, matching the rest of the page's language.
+CAUSE_LABEL = {
+    "mesh_bot": "Program bot tidak merespon",
+    "meshtasticd": "Koneksi ke radio mesh terputus",
+}
 # 2026-09-09: mesh_bot.service vs meshtasticd.service is an internal
 # implementation detail (mesh_bot is our own Python process, meshtasticd
 # is the separate daemon it talks to over a local API) -- a visitor to
@@ -433,9 +442,9 @@ for svc in DISPLAY_SERVICES:
     # opaque ("Bot: Down", no further info) instead of just less
     # cluttered on the happy path.
     if svc == "bot" and down:
-        _causes = [SERVICE_LABEL[s] for s in ("mesh_bot", "meshtasticd") if checks.get(s) != "up"]
+        _causes = [CAUSE_LABEL[s] for s in ("mesh_bot", "meshtasticd") if checks.get(s) != "up"]
         if _causes:
-            extra += f'<div class="row-extra">Penyebab: {", ".join(_causes)}</div>'
+            extra += f'<div class="row-extra">Penyebab: {"; ".join(_causes)}</div>'
     rows.append(f'''
         <div class="row">
           <div class="row-top">
