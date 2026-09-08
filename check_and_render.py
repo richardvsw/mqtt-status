@@ -840,8 +840,8 @@ for host in BROKERS:
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
             <div class="status {status_class}">{status_label}</div>
-            <span class="live-dot" data-live-host="{host}" title="Live: memuat..."></span>
           </div>
+          <div class="live-status" data-live-host="{host}"></div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
             <span>{HISTORY_DAYS} hari lalu</span>
@@ -1122,27 +1122,21 @@ html = f'''<!doctype html>
     .row-top {{ flex-wrap: wrap; }}
     .status {{ flex-basis: 100%; font-size: .78rem; }}
   }}
-  /* Small live-ping indicator next to the confirmed status -- see the
-     poll loop near the end of this file. Starts grey/unlabeled
-     ("memuat...") until the first successful poll, and falls back to
-     grey/stale ("live-stale") if the last push from GitHub Actions is
-     older than LIVE_STALE_SECONDS, so it never quietly shows a
-     minutes-old ping as if it were current. */
-  .live-dot {{
-    position: relative; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-    background: var(--faint); opacity: .5; margin-left: -.3rem;
+  /* Live-ping detail line under the confirmed status -- see the poll
+     loop near the end of this file. A separate SECOND dot here (the
+     first design) turned out to just confuse -- two dots per row with
+     no obvious meaning -- so this is plain text instead: what the
+     live layer actually saw and how long ago, colored to match but
+     never a dot of its own. Empty/hidden until the first poll lands,
+     and falls back to a "belum ada data live" line if the last push
+     from GitHub Actions is older than LIVE_STALE_SECONDS, so it never
+     quietly shows a minutes-old ping as if it were current. */
+  .live-status {{
+    font-size: .72rem; color: var(--faint); margin-top: .15rem; min-height: 1em;
   }}
-  .live-dot.live-up {{ background: var(--ok); opacity: 1; box-shadow: 0 0 0 2px var(--ok-dim); }}
-  .live-dot.live-up::after {{
-    content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ok);
-    animation: pulse 2.2s ease-out infinite;
-  }}
-  .live-dot.live-down {{ background: var(--crit); opacity: 1; box-shadow: 0 0 0 2px var(--crit-dim); }}
-  .live-dot.live-auth {{ background: var(--warn); opacity: 1; box-shadow: 0 0 0 2px var(--warn-dim); }}
-  .live-dot.live-stale {{ background: var(--faint); opacity: .4; }}
-  @media (prefers-reduced-motion: reduce) {{
-    .live-dot.live-up::after {{ animation: none; }}
-  }}
+  .live-status.live-up {{ color: var(--ok); }}
+  .live-status.live-down {{ color: var(--crit); }}
+  .live-status.live-auth {{ color: var(--warn); }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
   .status.autherr {{ color: var(--warn); }}
@@ -1601,9 +1595,9 @@ html = f'''<!doctype html>
       }};
 
       function setAllStale() {{
-        document.querySelectorAll(".live-dot").forEach(function (el) {{
-          el.className = "live-dot live-stale";
-          el.title = "Live: tidak ada data terkini";
+        document.querySelectorAll(".live-status").forEach(function (el) {{
+          el.className = "live-status";
+          el.textContent = "Live: belum ada data terkini";
         }});
       }}
 
@@ -1616,16 +1610,16 @@ html = f'''<!doctype html>
             var ageLabel = age < 60 ? Math.round(age) + "dtk lalu" : Math.round(age / 60) + "m lalu";
             document.querySelectorAll("[data-live-host]").forEach(function (el) {{
               var b = (data.brokers || {{}})[el.dataset.liveHost];
-              if (!b) {{ el.className = "live-dot live-stale"; el.title = "Live: belum ada data"; return; }}
+              if (!b) {{ el.className = "live-status"; el.textContent = "Live: belum ada data"; return; }}
               if (b.status === "up") {{
-                el.className = "live-dot live-up";
-                el.title = "Live: Aktif" + (b.latency_ms != null ? " · " + b.latency_ms + "ms" : "") + " (" + ageLabel + ")";
+                el.className = "live-status live-up";
+                el.textContent = "Live: Aktif" + (b.latency_ms != null ? " · " + b.latency_ms + "ms" : "") + " (" + ageLabel + ")";
               }} else if (b.status === "auth_error") {{
-                el.className = "live-dot live-auth";
-                el.title = "Live: Autentikasi Ditolak (" + ageLabel + ")";
+                el.className = "live-status live-auth";
+                el.textContent = "Live: Autentikasi Ditolak (" + ageLabel + ")";
               }} else {{
-                el.className = "live-dot live-down";
-                el.title = "Live: " + (REASON_LABEL[b.reason] || "Down") + " (" + ageLabel + ")";
+                el.className = "live-status live-down";
+                el.textContent = "Live: " + (REASON_LABEL[b.reason] || "Down") + " (" + ageLabel + ")";
               }}
             }});
           }})
