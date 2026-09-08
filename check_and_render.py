@@ -1398,8 +1398,8 @@ html = f'''<!doctype html>
     <div class="incident-log">{_incident_log_html()}</div>
     <footer>
       <div class="ping-legend">
-        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"}) • <span id="actions-ping-summary">memuat...</span></span>
         <span><i class="lg-lxc"></i>Ping lokal (real-time, ~25 detik) • <span id="local-ping-summary">memuat...</span></span>
+        <span><i class="lg-ci"></i>Ping GitHub Actions (rekap resmi, dari{f" {actions_city}" if actions_city else " luar negeri"}) • <span id="actions-ping-summary">memuat...</span></span>
       </div>
       Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a>
     </footer>
