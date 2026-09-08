@@ -1212,6 +1212,13 @@ html = f'''<!doctype html>
   .ping {{ font-variant-numeric: tabular-nums; font-weight: 600; }}
   .ping-lxc {{ color: var(--ok); }}
   .ping-ci {{ color: var(--accent); }}
+  /* Single global freshness summary (replaces a "Diperbarui X lalu" line
+     repeated on every one of the 6 rows below -- 2026-09-09, confirmed
+     confusing/redundant to show the same two clocks six times over).
+     Ticks every second client-side, same pattern as #live-clock. */
+  .ping-summary {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1rem; font-size: .78rem; margin: .3rem 0 .6rem; }}
+  .ping-summary .src-ci {{ color: var(--accent); }}
+  .ping-summary .src-lxc {{ color: var(--ok); }}
   .ping-legend {{ display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.2rem; margin-bottom: .6rem; font-size: .74rem; color: var(--faint); }}
   .ping-legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .ping-legend i {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
@@ -1376,7 +1383,11 @@ html = f'''<!doctype html>
         <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       </button>
     </div>
-    <div class="sub"><b>{up_count}/{total}</b> broker aktif — live tiap ~25 detik, rekap resmi tiap 10 menit</div>
+    <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
+    <div class="ping-summary">
+      <span class="src-ci" id="actions-ping-summary">Ping GitHub Actions • memuat...</span>
+      <span class="src-lxc" id="local-ping-summary">Ping lokal • memuat...</span>
+    </div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="bars-caption">
@@ -1651,25 +1662,59 @@ html = f'''<!doctype html>
     // confirmed status text above (that one only ever comes from this
     // page's own git-committed record, deliberately debounced against
     // false-positive blips). Polls a small endpoint on the homelab box
-    // for faster-than-10-min pings pushed there by GitHub Actions (see
-    // live_ping.py). Only ever shows something the confirmed status
-    // above didn't already say -- a quiet freshness timestamp when
-    // they agree (the normal case), or an amber early-warning line
-    // when the live check just disagrees with the confirmed status.
-    // Silent (not "no data") whenever there's nothing worth saying yet.
+    // for faster-than-10-min pings checked directly there (see
+    // public_site.py's broker-status self-check loop).
+    //
+    // 2026-09-09: the "diperbarui X lalu" freshness line used to repeat
+    // on all 6 rows -- confirmed redundant, since it's the same two
+    // clocks (this page's own generation time, and the local loop's
+    // last check) six times over. Now shown ONCE, ticking every second
+    // like #live-clock, in #actions-ping-summary/#local-ping-summary
+    // near the top. Each row's own .live-status line is now reserved
+    // for the one thing that IS genuinely per-broker: an amber warning
+    // when that broker's live check disagrees with its confirmed
+    // status -- silent otherwise (just the local ping ms, matching how
+    // the confirmed "Aktif · Xms" line above already works).
     (function () {{
       var LIVE_URL = "https://meshbot.rivi.my.id/api/public/broker-status";
       var POLL_MS = 20000;
-      var LIVE_STALE_SECONDS = 900; // 5-min Actions cron + generous slack
+      var LIVE_STALE_SECONDS = 900; // ~25s check interval + generous slack
+      var PAGE_GENERATED_AT = {int(now)};
       var REASON_LABEL = {{
         dns_error: "DNS gagal resolve", refused: "Koneksi ditolak",
         timeout: "Timeout", mqtt_rejected: "Ditolak broker", down: "Down"
       }};
 
+      var localCheckedAt = null;
+      var localHasData = false;
+
+      function fmtAge(seconds) {{
+        seconds = Math.max(0, Math.round(seconds));
+        if (seconds < 60) return seconds + "dtk lalu";
+        var minutes = Math.round(seconds / 60);
+        if (minutes < 60) return minutes + "m lalu";
+        var hours = Math.floor(minutes / 60);
+        return hours + "j " + (minutes % 60) + "m lalu";
+      }}
+
+      function tickSummaries() {{
+        var actionsEl = document.getElementById("actions-ping-summary");
+        if (actionsEl) {{
+          actionsEl.textContent = "Ping GitHub Actions • diperbarui " + fmtAge(Date.now() / 1000 - PAGE_GENERATED_AT);
+        }}
+        var localEl = document.getElementById("local-ping-summary");
+        if (localEl) {{
+          localEl.textContent = localHasData
+            ? "Ping lokal • diperbarui " + fmtAge(Date.now() / 1000 - localCheckedAt)
+            : "Ping lokal • tidak ada data terkini";
+        }}
+      }}
+
       function clearAll() {{
+        localHasData = false;
         document.querySelectorAll(".live-status").forEach(function (el) {{
           el.className = "live-status";
-          el.textContent = "";
+          el.innerHTML = "";
         }});
       }}
 
@@ -1679,10 +1724,11 @@ html = f'''<!doctype html>
           .then(function (data) {{
             var age = data.checked_at ? (Date.now() / 1000 - data.checked_at) : Infinity;
             if (age > LIVE_STALE_SECONDS) {{ clearAll(); return; }}
-            var ageLabel = age < 60 ? Math.round(age) + "dtk lalu" : Math.round(age / 60) + "m lalu";
+            localCheckedAt = data.checked_at;
+            localHasData = true;
             document.querySelectorAll("[data-live-host]").forEach(function (el) {{
               var b = (data.brokers || {{}})[el.dataset.liveHost];
-              if (!b) {{ el.className = "live-status"; el.textContent = ""; return; }}
+              if (!b) {{ el.className = "live-status"; el.innerHTML = ""; return; }}
               // Confirmed status classes are "up" / "down" / "autherr" --
               // live status is "up" / "down" / "auth_error", so treat
               // anything non-"up" on either side as the same "not up"
@@ -1692,21 +1738,23 @@ html = f'''<!doctype html>
               var liveUp = b.status === "up";
               if (confirmedUp === liveUp) {{
                 el.className = "live-status";
-                var pingHtml = (liveUp && b.latency_ms != null)
-                  ? '<span class="ping ping-lxc">' + b.latency_ms + 'ms</span> · ' : "";
-                el.innerHTML = pingHtml + "Diperbarui " + ageLabel;
+                el.innerHTML = (liveUp && b.latency_ms != null)
+                  ? '<span class="ping ping-lxc">' + b.latency_ms + 'ms</span>' : "";
               }} else if (liveUp) {{
                 el.className = "live-status live-mismatch";
-                el.textContent = "⚠ Live check baru saja berhasil (" + ageLabel + ") — belum dikonfirmasi";
+                el.textContent = "⚠ Live check baru saja berhasil (" + fmtAge(age) + ") — belum dikonfirmasi";
               }} else {{
                 var reasonText = b.status === "auth_error" ? "Autentikasi ditolak" : (REASON_LABEL[b.reason] || "Down");
                 el.className = "live-status live-mismatch";
-                el.textContent = "⚠ Live check baru saja gagal: " + reasonText + " (" + ageLabel + ") — belum dikonfirmasi";
+                el.textContent = "⚠ Live check baru saja gagal: " + reasonText + " (" + fmtAge(age) + ") — belum dikonfirmasi";
               }}
             }});
           }})
           .catch(clearAll);
       }}
+
+      tickSummaries();
+      setInterval(tickSummaries, 1000);
 
       poll();
       setInterval(poll, POLL_MS);
