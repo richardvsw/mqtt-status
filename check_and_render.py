@@ -327,6 +327,31 @@ bot_long_name = os.environ.get("BOT_LONG_NAME", "").strip()
 if bot_long_name:
     meta["lxc_bot_name"] = bot_long_name
 
+# 2026-09-09: refine each newly-detected outage's START time using
+# CT104's own fast (~25-50s confirm) transition log, pulled fresh every
+# run -- see public_site.py's _broker_live_loop/_append_transition_log
+# for how that log is built. This NEVER decides whether an outage
+# happened -- that's still entirely this run's own raw_status plus the
+# CONFIRM_THRESHOLD debounce below, unchanged -- it only tightens the
+# recorded timestamp of a transition this run is ALREADY about to
+# treat as newly-down, from this run's own ~10-min granularity down to
+# the LXC's ~25-50s granularity. If the LXC has been offline (no log,
+# or nothing recent enough), this silently falls back to `now`, same
+# as if this feature didn't exist at all.
+REFINE_WINDOW_SECONDS = 900  # generous vs GitHub Actions' own ~10-min cadence
+_lxc_broker_down_ts = {}  # host -> latest down-transition ts within the window
+try:
+    with urllib.request.urlopen("https://meshbot.rivi.my.id/api/public/broker-log", timeout=8) as resp:
+        _lxc_log = json.load(resp).get("log", [])
+    _refine_cutoff = now - REFINE_WINDOW_SECONDS
+    for _entry in _lxc_log:
+        if _entry.get("status") != "up" and _entry.get("ts", 0) >= _refine_cutoff:
+            _host = _entry.get("host")
+            if _host and _entry["ts"] > _lxc_broker_down_ts.get(_host, 0):
+                _lxc_broker_down_ts[_host] = _entry["ts"]
+except Exception as e:
+    print(f"broker-log refine: fetch failed, falling back to this run's own timing: {e}")
+
 brokers = {}
 for host in BROKERS:
     raw_status, latency_ms, raw_reason = check_broker(host)  # "up" / "auth_error" / "down"
@@ -374,7 +399,13 @@ for host in BROKERS:
         # CONFIRM_THRESHOLD runs.
         st["down_reason"] = raw_reason
         if st["provisional_start"] is None:
-            st["provisional_start"] = now
+            # Prefer the LXC's own precise down-transition time for THIS
+            # host if one exists within the window -- falls back to
+            # `now` (this run's own coarser detection) otherwise, e.g.
+            # if the LXC was offline or never saw this particular blip
+            # (it has its own debounce too, so a genuinely transient
+            # sub-minute flicker may never appear in its log at all).
+            st["provisional_start"] = _lxc_broker_down_ts.get(host, now)
         if st["consecutive_fails"] >= CONFIRM_THRESHOLD:
             # Promote to a confirmed, publicly-displayed outage -- keep the
             # TRUE first-failure time, not the moment it got confirmed, so

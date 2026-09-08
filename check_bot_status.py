@@ -174,6 +174,28 @@ except Exception as e:
 # the other two.
 checks["bot"] = "up" if checks["mesh_bot"] == "up" and checks["meshtasticd"] == "up" else "down"
 
+# 2026-09-09: refine each newly-detected outage's START time using
+# CT104's own fast (~25-50s confirm) transition log -- see
+# public_site.py's _bot_live_loop/_append_transition_log. Never decides
+# WHETHER an outage happened (that's still this run's own raw check
+# plus CONFIRM_THRESHOLD below), only tightens the recorded timestamp
+# from this run's ~10-min granularity down to the LXC's ~25-50s one.
+# Falls back to `now` if the LXC has no recent-enough entry (offline,
+# or the blip was too short-lived for even ITS debounce to catch).
+REFINE_WINDOW_SECONDS = 900
+_lxc_bot_down_ts = {}  # svc -> latest down-transition ts within the window
+try:
+    with urllib.request.urlopen("https://meshbot.rivi.my.id/api/public/bot-log", timeout=8) as resp:
+        _lxc_bot_log = json.load(resp).get("log", [])
+    _refine_cutoff = now - REFINE_WINDOW_SECONDS
+    for _entry in _lxc_bot_log:
+        if _entry.get("status") == "down" and _entry.get("ts", 0) >= _refine_cutoff:
+            _svc = _entry.get("svc")
+            if _svc and _entry["ts"] > _lxc_bot_down_ts.get(_svc, 0):
+                _lxc_bot_down_ts[_svc] = _entry["ts"]
+except Exception as e:
+    print(f"bot-log refine: fetch failed, falling back to this run's own timing: {e}")
+
 for svc, status in checks.items():
     st = state.setdefault(svc, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
     st.setdefault("consecutive_fails", 0)
@@ -185,7 +207,15 @@ for svc, status in checks.items():
     else:
         st["consecutive_fails"] += 1
         if st["provisional_start"] is None:
-            st["provisional_start"] = now
+            if svc == "bot":
+                # Earliest of whichever underlying service(s) are
+                # currently down -- "bot" as a whole has been broken
+                # since the FIRST thing broke, not since the last one.
+                _candidates = [_lxc_bot_down_ts[s] for s in ("mesh_bot", "meshtasticd")
+                               if checks.get(s) != "up" and s in _lxc_bot_down_ts]
+                st["provisional_start"] = min(_candidates) if _candidates else now
+            else:
+                st["provisional_start"] = _lxc_bot_down_ts.get(svc, now)
         if st["consecutive_fails"] >= CONFIRM_THRESHOLD:
             st["current_outage_start"] = st["provisional_start"]
         else:
