@@ -1,0 +1,25 @@
+name: Live broker ping (push-only, no git commit)
+
+# Native GitHub Actions cron (5 min is the practical floor -- GitHub
+# doesn't guarantee anything tighter, and can silently delay runs under
+# load). If tighter-than-5-min freshness is ever wanted, point whatever
+# external cron already drives check-status.yml's workflow_dispatch (see
+# that workflow's own comment) at this one too, in addition to its own
+# schedule below -- the two triggers aren't exclusive.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  live-ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q paho-mqtt
+      - run: python3 live_ping.py
+        env:
+          MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
+          MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
+          BROKER_STATUS_PUSH_URL: ${{ secrets.BROKER_STATUS_PUSH_URL }}
+          BROKER_STATUS_PUSH_TOKEN: ${{ secrets.BROKER_STATUS_PUSH_TOKEN }}

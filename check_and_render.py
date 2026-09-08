@@ -840,6 +840,7 @@ for host in BROKERS:
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
             <div class="status {status_class}">{status_label}</div>
+            <span class="live-dot" data-live-host="{host}" title="Live: memuat..."></span>
           </div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
@@ -1120,6 +1121,27 @@ html = f'''<!doctype html>
   @media (max-width: 480px) {{
     .row-top {{ flex-wrap: wrap; }}
     .status {{ flex-basis: 100%; font-size: .78rem; }}
+  }}
+  /* Small live-ping indicator next to the confirmed status -- see the
+     poll loop near the end of this file. Starts grey/unlabeled
+     ("memuat...") until the first successful poll, and falls back to
+     grey/stale ("live-stale") if the last push from GitHub Actions is
+     older than LIVE_STALE_SECONDS, so it never quietly shows a
+     minutes-old ping as if it were current. */
+  .live-dot {{
+    position: relative; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--faint); opacity: .5; margin-left: -.3rem;
+  }}
+  .live-dot.live-up {{ background: var(--ok); opacity: 1; box-shadow: 0 0 0 2px var(--ok-dim); }}
+  .live-dot.live-up::after {{
+    content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--ok);
+    animation: pulse 2.2s ease-out infinite;
+  }}
+  .live-dot.live-down {{ background: var(--crit); opacity: 1; box-shadow: 0 0 0 2px var(--crit-dim); }}
+  .live-dot.live-auth {{ background: var(--warn); opacity: 1; box-shadow: 0 0 0 2px var(--warn-dim); }}
+  .live-dot.live-stale {{ background: var(--faint); opacity: .4; }}
+  @media (prefers-reduced-motion: reduce) {{
+    .live-dot.live-up::after {{ animation: none; }}
   }}
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
@@ -1558,6 +1580,61 @@ html = f'''<!doctype html>
     }}
     tickClock();
     setInterval(tickClock, 1000);
+  </script>
+  <script>
+    // Best-effort LIVE layer -- separate from and never overrides the
+    // confirmed status text above (that one only ever comes from this
+    // page's own git-committed record, deliberately debounced against
+    // false-positive blips). This just polls a small endpoint on the
+    // homelab box for faster-than-10-min pings pushed there by GitHub
+    // Actions (see live_ping.py) -- if the homelab is offline, or a
+    // poll fails, or the pushed data is older than LIVE_STALE_SECONDS,
+    // every dot just goes grey/"stale" rather than showing anything
+    // it's not confident is current.
+    (function () {{
+      var LIVE_URL = "https://meshbot.rivi.my.id/api/public/broker-status";
+      var POLL_MS = 20000;
+      var LIVE_STALE_SECONDS = 900; // 5-min Actions cron + generous slack
+      var REASON_LABEL = {{
+        dns_error: "DNS gagal resolve", refused: "Koneksi ditolak",
+        timeout: "Timeout", mqtt_rejected: "Ditolak broker", down: "Down"
+      }};
+
+      function setAllStale() {{
+        document.querySelectorAll(".live-dot").forEach(function (el) {{
+          el.className = "live-dot live-stale";
+          el.title = "Live: tidak ada data terkini";
+        }});
+      }}
+
+      function poll() {{
+        fetch(LIVE_URL, {{ cache: "no-store" }})
+          .then(function (r) {{ return r.ok ? r.json() : Promise.reject(r.status); }})
+          .then(function (data) {{
+            var age = data.checked_at ? (Date.now() / 1000 - data.checked_at) : Infinity;
+            if (age > LIVE_STALE_SECONDS) {{ setAllStale(); return; }}
+            var ageLabel = age < 60 ? Math.round(age) + "dtk lalu" : Math.round(age / 60) + "m lalu";
+            document.querySelectorAll("[data-live-host]").forEach(function (el) {{
+              var b = (data.brokers || {{}})[el.dataset.liveHost];
+              if (!b) {{ el.className = "live-dot live-stale"; el.title = "Live: belum ada data"; return; }}
+              if (b.status === "up") {{
+                el.className = "live-dot live-up";
+                el.title = "Live: Aktif" + (b.latency_ms != null ? " · " + b.latency_ms + "ms" : "") + " (" + ageLabel + ")";
+              }} else if (b.status === "auth_error") {{
+                el.className = "live-dot live-auth";
+                el.title = "Live: Autentikasi Ditolak (" + ageLabel + ")";
+              }} else {{
+                el.className = "live-dot live-down";
+                el.title = "Live: " + (REASON_LABEL[b.reason] || "Down") + " (" + ageLabel + ")";
+              }}
+            }});
+          }})
+          .catch(setAllStale);
+      }}
+
+      poll();
+      setInterval(poll, POLL_MS);
+    }})();
   </script>
 </body>
 </html>
