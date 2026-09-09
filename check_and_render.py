@@ -352,6 +352,24 @@ try:
 except Exception as e:
     print(f"broker-log refine: fetch failed, falling back to this run's own timing: {e}")
 
+# 2026-09-09: EMQX's OWN cluster-membership snapshot (see public_site.py's
+# _emqx_health_loop, polled every ~30s directly against the cluster's
+# management API) -- catches a failure mode an external MQTT connect
+# fundamentally can't: a node accepting connections fine while having
+# fallen out of the cluster. Only used to REFINE the reason label on a
+# host this run has already independently confirmed down (same
+# never-create-only-refine rule as everything else here) -- never lets a
+# desynced-but-reachable node get marked down on EMQX's say-so alone.
+EMQX_HEALTH_STALE_SECONDS = 300  # ~10x the ~30s poll interval, generous slack
+_emqx_nodes_not_running = set()
+try:
+    with urllib.request.urlopen("https://meshbot.rivi.my.id/api/public/emqx-health", timeout=8) as resp:
+        _emqx = json.load(resp)
+    if _emqx.get("checked_at") and (now - _emqx["checked_at"]) < EMQX_HEALTH_STALE_SECONDS:
+        _emqx_nodes_not_running = {n["node"] for n in _emqx.get("nodes_not_running", [])}
+except Exception as e:
+    print(f"emqx-health: fetch failed, skipping node-desync enrichment: {e}")
+
 brokers = {}
 for host in BROKERS:
     raw_status, latency_ms, raw_reason = check_broker(host)  # "up" / "auth_error" / "down"
@@ -396,8 +414,17 @@ for host in BROKERS:
         # Always the latest attempt's reason, even before the outage is
         # confirmed -- so the very first "Down" render already carries a
         # specific reason instead of a generic one for the first
-        # CONFIRM_THRESHOLD runs.
-        st["down_reason"] = raw_reason
+        # CONFIRM_THRESHOLD runs. EMQX's own cluster-membership answer
+        # (when fresh) overrides the connect-based guess -- it's a
+        # direct answer from the cluster itself, strictly more precise
+        # than inferring a reason from the outside. Only mqtt1-mqtt5 map
+        # to a real cluster node this way; mqtt.meshnode.id is a DNS
+        # failover alias, not a node of its own, so it always keeps its
+        # connect-based reason.
+        if f"emqx@{host}" in _emqx_nodes_not_running:
+            st["down_reason"] = "node_desync"
+        else:
+            st["down_reason"] = raw_reason
         if st["provisional_start"] is None:
             # Prefer the LXC's own precise down-transition time for THIS
             # host if one exists within the window -- falls back to
@@ -668,6 +695,7 @@ DOWN_REASON_LABEL = {
     "timeout": "Timeout",
     "mqtt_rejected": "Ditolak Broker",
     "down": "Down",
+    "node_desync": "Node Tidak Sinkron",
 }
 
 
@@ -1705,7 +1733,7 @@ html = f'''<!doctype html>
         if (localEl) {{
           localEl.textContent = localHasData
             ? "diperbarui " + fmtAge(Date.now() / 1000 - localCheckedAt)
-            : "tidak ada data terkini";
+            : "server tidak terjangkau";
         }}
       }}
 
