@@ -822,6 +822,12 @@ html = f'''<!doctype html>
         var row = bar.closest(".row");
         row.appendChild(popCaret);
         row.appendChild(pop);
+        var barRect = bar.getBoundingClientRect();
+        var rowRect = row.getBoundingClientRect();
+        var offset = (barRect.left + barRect.width / 2) - (rowRect.left + rowRect.width / 2);
+        var maxOffset = rowRect.width / 2 - 16;
+        offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
+        popCaret.style.left = offset + "px";
         popCaret.classList.add("open");
         pop.classList.add("open");
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});

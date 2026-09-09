@@ -1575,6 +1575,22 @@ html = f'''<!doctype html>
         var row = bar.closest(".row");
         row.appendChild(popCaret);
         row.appendChild(pop);
+        // popCaret's own CSS centers it (margin:auto) inside .row's
+        // content box by default -- that default center happens to
+        // line up with the bars strip's own center too, since .bars
+        // fills the same content width with no extra padding of its
+        // own. Nudging left/right from there by the clicked bar's own
+        // offset from that shared center is enough to point the caret
+        // at the specific bar, with none of the viewport-relative math
+        // the old floating arrow needed (this is purely relative to
+        // .row's own box, which doesn't move under the caret the way
+        // the viewport could).
+        var barRect = bar.getBoundingClientRect();
+        var rowRect = row.getBoundingClientRect();
+        var offset = (barRect.left + barRect.width / 2) - (rowRect.left + rowRect.width / 2);
+        var maxOffset = rowRect.width / 2 - 16;
+        offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
+        popCaret.style.left = offset + "px";
         popCaret.classList.add("open");
         pop.classList.add("open");
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
@@ -2074,6 +2090,15 @@ uptime_html = f"""<!doctype html>
       var month = cell.closest(".cal-month");
       month.appendChild(popCaret);
       month.appendChild(pop);
+      // See index.html's own click handler for the reasoning -- same
+      // nudge-from-center trick, just relative to .cal-month instead
+      // of .row.
+      var cellRect = cell.getBoundingClientRect();
+      var monthRect = month.getBoundingClientRect();
+      var offset = (cellRect.left + cellRect.width / 2) - (monthRect.left + monthRect.width / 2);
+      var maxOffset = monthRect.width / 2 - 16;
+      offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
+      popCaret.style.left = offset + "px";
       popCaret.classList.add("open");
       pop.classList.add("open");
       pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
