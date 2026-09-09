@@ -653,7 +653,7 @@ html = f'''<!doctype html>
   .sub b {{ color: var(--text); font-weight: 600; }}
 
   .panel {{ background: var(--surf); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }}
-  .row {{ padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft); font-size: .92rem; }}
+  .row {{ position: relative; padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft); font-size: .92rem; }}
   .row:first-child {{ border-top: none; border-top-left-radius: 14px; border-top-right-radius: 14px; }}
   .row:last-child {{ border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }}
   .row-top {{ display: flex; justify-content: space-between; align-items: center; gap: .8rem; margin-bottom: .3rem; }}
@@ -678,17 +678,17 @@ html = f'''<!doctype html>
      -- see mqtt-status-repo's check_and_render.py own .daypop comment
      for the full reasoning. */
   .daypop {{
-    display: none; margin-top: .9rem;
+    display: none; position: absolute; z-index: 5;
+    width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
   .daypop-caret {{
-    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    display: none; position: absolute; z-index: 6; width: 12px; height: 12px;
     background: var(--surf2); border-left: 1px solid var(--border);
     border-top: 1px solid var(--border); transform: rotate(45deg);
-    position: relative; z-index: 1;
   }}
   .daypop-caret.open {{ display: block; }}
   .daypop-head {{
@@ -822,14 +822,19 @@ html = f'''<!doctype html>
         var row = bar.closest(".row");
         row.appendChild(popCaret);
         row.appendChild(pop);
-        var barRect = bar.getBoundingClientRect();
-        var rowRect = row.getBoundingClientRect();
-        var offset = (barRect.left + barRect.width / 2) - (rowRect.left + rowRect.width / 2);
-        var maxOffset = rowRect.width / 2 - 16;
-        offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
-        popCaret.style.left = offset + "px";
         popCaret.classList.add("open");
         pop.classList.add("open");
+        var barRect = bar.getBoundingClientRect();
+        var rowRect = row.getBoundingClientRect();
+        var barsRect = bar.closest(".bars").getBoundingClientRect();
+        var caretTop = barsRect.bottom - rowRect.top + 10;
+        popCaret.style.top = caretTop + "px";
+        pop.style.top = (caretTop + 14) + "px";
+        var centerX = barRect.left + barRect.width / 2 - rowRect.left;
+        var popWidth = pop.offsetWidth || 300;
+        var left = Math.min(Math.max(centerX - popWidth / 2, 8), rowRect.width - popWidth - 8);
+        pop.style.left = left + "px";
+        popCaret.style.left = Math.min(Math.max(centerX - 6, 16), rowRect.width - 18) + "px";
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});
     }});

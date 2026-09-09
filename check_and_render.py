@@ -1227,7 +1227,7 @@ html = f'''<!doctype html>
     box-shadow: var(--shadow);
   }}
   .row {{
-    padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft);
+    position: relative; padding: 1rem 1.25rem 1.1rem; border-top: 1px solid var(--border-soft);
     font-size: .92rem; transition: background .12s;
   }}
   .row:first-child {{ border-top: none; border-top-left-radius: 14px; border-top-right-radius: 14px; }}
@@ -1323,35 +1323,36 @@ html = f'''<!doctype html>
      kind of incident (e.g. both a real outage AND an auth rejection).
      Open-close logic lives in the <script> block below; this is just
      the card's visual shell.
-     2026-09-09: was a position:fixed floating overlay anchored near the
-     clicked bar -- went through three rounds of positioning bugs (arrow
-     misalignment, stretch-to-fill-gap, anchored to the wrong edge) and
-     still cut off content on some phones/viewports. Rebuilt as a plain
-     in-flow block instead: JS moves this single shared element into the
-     clicked bar's own .row, right after its bars strip, so it just
-     appears directly under that row like any other page content --
-     no viewport math, no repositioning on resize/scroll/font-load
-     needed at all -- but the card no longer visually points at any
-     one bar (it spans the whole row), so a small static caret sits
-     between the bars and the card instead, just to read as "this
-     belongs to the row above" rather than a disconnected block. */
+     2026-09-09: was a position:fixed floating overlay anchored near
+     the clicked bar -- went through three rounds of positioning bugs
+     (arrow misalignment, stretch-to-fill-gap, anchored to the wrong
+     edge) and still cut off content on some phones/viewports. Briefly
+     rebuilt as a plain in-flow block (pushing the page down instead of
+     overlapping), which fixed all of that, but read as visually
+     disconnected from status.claude.com's own reference design -- its
+     popover overlaps the rows below instead of pushing them, and is a
+     narrower centered card rather than full row width. Landed here
+     instead: position:absolute anchored to .row (not the viewport),
+     so it moves with the page automatically (no scroll listener
+     needed) and only ever needs repositioning relative to its own
+     row's box, not the whole viewport -- a much smaller, safer surface
+     than the original position:fixed version. */
   .daypop {{
-    display: none; margin-top: .9rem;
+    display: none; position: absolute; z-index: 5;
+    width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
-  /* Plain in-flow diamond, not a floating/positioned element -- JS
-     moves it right before .daypop in the same .row so it always sits
-     directly above the card, no coordinates needed. Sits outside
-     .daypop's own box (not a pseudo-element of it) so it's never
-     clipped by .daypop's overflow-y:auto. */
+  /* Pulled out of .daypop itself (rather than a ::before pseudo-
+     element) for the same reason as the old floating version: overflow-
+     y:auto on .daypop would clip a pseudo-element positioned outside
+     its own box the moment the card is tall enough to scroll. */
   .daypop-caret {{
-    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    display: none; position: absolute; z-index: 6; width: 12px; height: 12px;
     background: var(--surf2); border-left: 1px solid var(--border);
     border-top: 1px solid var(--border); transform: rotate(45deg);
-    position: relative; z-index: 1;
   }}
   .daypop-caret.open {{ display: block; }}
   .daypop-head {{
@@ -1575,24 +1576,25 @@ html = f'''<!doctype html>
         var row = bar.closest(".row");
         row.appendChild(popCaret);
         row.appendChild(pop);
-        // popCaret's own CSS centers it (margin:auto) inside .row's
-        // content box by default -- that default center happens to
-        // line up with the bars strip's own center too, since .bars
-        // fills the same content width with no extra padding of its
-        // own. Nudging left/right from there by the clicked bar's own
-        // offset from that shared center is enough to point the caret
-        // at the specific bar, with none of the viewport-relative math
-        // the old floating arrow needed (this is purely relative to
-        // .row's own box, which doesn't move under the caret the way
-        // the viewport could).
-        var barRect = bar.getBoundingClientRect();
-        var rowRect = row.getBoundingClientRect();
-        var offset = (barRect.left + barRect.width / 2) - (rowRect.left + rowRect.width / 2);
-        var maxOffset = rowRect.width / 2 - 16;
-        offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
-        popCaret.style.left = offset + "px";
         popCaret.classList.add("open");
         pop.classList.add("open");
+        // .daypop/.daypop-caret are position:absolute against .row
+        // (position:relative) -- coordinates only ever need to be
+        // relative to THIS row's own box, not the viewport, so this
+        // never needs a resize/scroll listener the way the old
+        // position:fixed version did: the row itself moves with the
+        // page, and the popover moves with its row for free.
+        var barRect = bar.getBoundingClientRect();
+        var rowRect = row.getBoundingClientRect();
+        var barsRect = bar.closest(".bars").getBoundingClientRect();
+        var caretTop = barsRect.bottom - rowRect.top + 10;
+        popCaret.style.top = caretTop + "px";
+        pop.style.top = (caretTop + 14) + "px";
+        var centerX = barRect.left + barRect.width / 2 - rowRect.left;
+        var popWidth = pop.offsetWidth || 300;
+        var left = Math.min(Math.max(centerX - popWidth / 2, 8), rowRect.width - popWidth - 8);
+        pop.style.left = left + "px";
+        popCaret.style.left = Math.min(Math.max(centerX - 6, 16), rowRect.width - 18) + "px";
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});
     }});
@@ -1939,7 +1941,7 @@ uptime_html = f"""<!doctype html>
      wrapping row -- now only one broker/month shows at a time (see
      the dropdown + 3-month-window rework), so capping width just
      wasted most of the screen on mobile for no reason. */
-  .cal-month {{ width: 100%; max-width: 420px; margin: 0 auto; }}
+  .cal-month {{ position: relative; width: 100%; max-width: 420px; margin: 0 auto; }}
   .cal-month-head {{
     display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600;
     color: var(--muted); margin-bottom: .4rem;
@@ -1956,20 +1958,21 @@ uptime_html = f"""<!doctype html>
   .note {{ color: var(--faint); font-size: .82rem; }}
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
 
-  /* 2026-09-09: in-flow instead of a floating position:fixed overlay
-     -- see index.html's own .daypop comment for the full reasoning. */
+  /* Anchored to .cal-month (position:relative) rather than the
+     viewport -- see index.html's own .daypop comment for the full
+     reasoning. */
   .daypop {{
-    display: none; margin-top: .9rem;
+    display: none; position: absolute; z-index: 5;
+    width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
   .daypop-caret {{
-    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    display: none; position: absolute; z-index: 6; width: 12px; height: 12px;
     background: var(--surf2); border-left: 1px solid var(--border);
     border-top: 1px solid var(--border); transform: rotate(45deg);
-    position: relative; z-index: 1;
   }}
   .daypop-caret.open {{ display: block; }}
   .daypop-head {{
@@ -2090,17 +2093,22 @@ uptime_html = f"""<!doctype html>
       var month = cell.closest(".cal-month");
       month.appendChild(popCaret);
       month.appendChild(pop);
-      // See index.html's own click handler for the reasoning -- same
-      // nudge-from-center trick, just relative to .cal-month instead
-      // of .row.
-      var cellRect = cell.getBoundingClientRect();
-      var monthRect = month.getBoundingClientRect();
-      var offset = (cellRect.left + cellRect.width / 2) - (monthRect.left + monthRect.width / 2);
-      var maxOffset = monthRect.width / 2 - 16;
-      offset = Math.min(Math.max(offset, -maxOffset), maxOffset);
-      popCaret.style.left = offset + "px";
       popCaret.classList.add("open");
       pop.classList.add("open");
+      // See index.html's own click handler for the reasoning -- same
+      // row-relative absolute positioning, just against .cal-month and
+      // .cal-grid instead of .row and .bars.
+      var cellRect = cell.getBoundingClientRect();
+      var monthRect = month.getBoundingClientRect();
+      var gridRect = cell.closest(".cal-grid").getBoundingClientRect();
+      var caretTop = gridRect.bottom - monthRect.top + 10;
+      popCaret.style.top = caretTop + "px";
+      pop.style.top = (caretTop + 14) + "px";
+      var centerX = cellRect.left + cellRect.width / 2 - monthRect.left;
+      var popWidth = pop.offsetWidth || 300;
+      var left = Math.min(Math.max(centerX - popWidth / 2, 8), monthRect.width - popWidth - 8);
+      pop.style.left = left + "px";
+      popCaret.style.left = Math.min(Math.max(centerX - 6, 16), monthRect.width - 18) + "px";
       pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
     }}
 
