@@ -1326,6 +1326,12 @@ html = f'''<!doctype html>
   .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 
   .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
+  /* 2026-09-09: used to repeat "{HISTORY_DAYS} hari lalu ... Hari ini"
+     once more here, below a panel where every single row already shows
+     that exact same pair right under its own bars -- confirmed
+     redundant/unused. Only the color-meaning legend itself was new
+     information at this position, so that's all that's left. */
+  .legend-standalone {{ display: flex; justify-content: center; margin-top: 1.1rem; font-size: .72rem; color: var(--faint); }}
   /* Per-row variant (status.claude.com's own "30 days ago —— 99.22%
      uptime —— Today" line, one under each service's bar strip) --
      tighter than the page-level .bars-caption since there's now one of
@@ -1396,10 +1402,8 @@ html = f'''<!doctype html>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
-    <div class="bars-caption">
-      <span>{HISTORY_DAYS} hari lalu</span>
+    <div class="legend-standalone">
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
-      <span>Hari ini</span>
     </div>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
