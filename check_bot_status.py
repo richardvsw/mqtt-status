@@ -800,13 +800,23 @@ html = f'''<!doctype html>
       var spaceAbove = r.top;
       var vMargin = 8;
       pop.style.transform = "translateY(0)";
+      pop.style.top = "";
+      pop.style.bottom = "";
+      // Single-edge anchor, relative to the bar -- setting both top AND
+      // bottom stretches the box to fill that exact gap even for short
+      // content instead of sizing to it (a short "no incident" card
+      // rendered with a large empty area below its text). Anchoring
+      // from just one edge -- bottom (relative to the bar's own top)
+      // when there's room above, top (relative to the bar's own
+      // bottom) otherwise -- lets the card size to its actual content
+      // while still sitting next to the bar that was clicked, not
+      // pinned to a fixed viewport offset. .daypop's own
+      // max-height:calc(100vh - 2rem) still caps a genuinely tall card.
       if (spaceAbove > 220) {{
-        pop.style.top = vMargin + "px";
         pop.style.bottom = (viewH - r.top + 12) + "px";
         pop.classList.add("arrow-down");
       }} else {{
         pop.style.top = (r.bottom + 12) + "px";
-        pop.style.bottom = vMargin + "px";
         pop.classList.add("arrow-up");
       }}
       pop.style.left = left + "px";
