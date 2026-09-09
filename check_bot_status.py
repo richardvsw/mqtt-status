@@ -594,7 +594,7 @@ html = f'''<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Status Bot — RiV-meshBot</title>
+<title>Bot Status</title>
 <meta name="description" content="Status langsung layanan RiV-meshBot">
 <script>
   setTimeout(function () {{
@@ -744,7 +744,7 @@ html = f'''<!doctype html>
     <a class="back" href="index.html">← Status broker MQTT</a>
     <div class="titlebar">
       <img class="glyph" src="assets/riv-meshbot-logo.png" alt="RiV-meshBot">
-      <h1>Status Bot — RiV-meshBot</h1>
+      <h1>Bot Status</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> layanan normal</div>
