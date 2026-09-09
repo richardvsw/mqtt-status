@@ -1321,44 +1321,24 @@ html = f'''<!doctype html>
      "click a day, see a card with the incident type + duration" pattern,
      which a one-line tooltip can't express once a day has more than one
      kind of incident (e.g. both a real outage AND an auth rejection).
-     Positioning/open-close logic lives in the <script> block below;
-     this is just the card's visual shell. */
+     Open-close logic lives in the <script> block below; this is just
+     the card's visual shell.
+     2026-09-09: was a position:fixed floating overlay anchored near the
+     clicked bar -- went through three rounds of positioning bugs (arrow
+     misalignment, stretch-to-fill-gap, anchored to the wrong edge) and
+     still cut off content on some phones/viewports. Rebuilt as a plain
+     in-flow block instead: JS moves this single shared element into the
+     clicked bar's own .row, right after its bars strip, so it just
+     appears directly under that row like any other page content --
+     no viewport math, no arrow element, no repositioning on
+     resize/scroll/font-load needed at all. */
   .daypop {{
-    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    display: none; margin-top: .9rem;
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
-    transform: translateY(4px); transition: opacity .12s, transform .12s;
-    /* 2026-08-22: a day with several incidents could grow taller than
-       the viewport -- confirmed live on a phone screen: the card's
-       TOP (date header + close button) scrolled off-screen with no way
-       to reach it, since position:fixed doesn't scroll with the page.
-       Capping height and scrolling internally instead fixes that;
-       padding moved off this element onto .daypop-head/#daypop-body
-       individually so the head can stay pinned while the body scrolls.
-    */
-    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
+    box-shadow: var(--shadow); padding: 0;
+    max-height: 360px; overflow-y: auto;
   }}
-  .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
-  /* 2026-08-22: the arrow used to be a ::before pseudo-element of
-     .daypop itself, positioned at top:-6px/bottom:-6px (i.e. just
-     outside the card's own box). That broke the moment .daypop grew
-     overflow-y:auto for the scrollable-popover fix -- overflow clips
-     ANY child positioned outside the element's box, pseudo-elements
-     included, so the arrow was invisible (or showed a stray clipped
-     sliver) any time the card was tall enough to scroll, confirmed
-     live via screenshot. Pulled out into its own always-fixed sibling
-     element so it's never inside .daypop's scrolling/clipping context
-     -- its position is computed in JS from the popover's actual
-     rendered edges (getBoundingClientRect), not a CSS offset relative
-     to a box that might clip it. */
-  .daypop-arrow {{
-    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
-    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
-    opacity: 0; pointer-events: none; transition: opacity .12s;
-  }}
-  .daypop-arrow.open {{ opacity: 1; }}
-  .daypop-arrow.arrow-up {{ transform: rotate(45deg); }}
-  .daypop-arrow.arrow-down {{ transform: rotate(225deg); }}
+  .daypop.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -1488,7 +1468,6 @@ html = f'''<!doctype html>
     </div>
     <div id="daypop-body"></div>
   </div>
-  <div class="daypop-arrow" id="daypop-arrow"></div>
   <script>
     // Click-to-open day popover -- same interaction status.claude.com
     // uses (click a day cell, get a card with incident type + duration),
@@ -1499,12 +1478,10 @@ html = f'''<!doctype html>
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
-    var popArrow = document.getElementById("daypop-arrow");
     var activeBar = null;
 
     function closePop() {{
       pop.classList.remove("open");
-      popArrow.classList.remove("open");
       if (activeBar) activeBar.classList.remove("active");
       activeBar = null;
     }}
@@ -1526,118 +1503,6 @@ html = f'''<!doctype html>
       return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
              '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
              '</div><span class="daypop-row-dur">' + dur + '</span></div>';
-    }}
-
-    // 2026-08-22: pulled out of the click handler so it can be re-run,
-    // not just computed once at click time. Real-device testing kept
-    // showing the arrow landing somewhere on the card's face instead of
-    // its edge, despite the exact same logic measuring correctly every
-    // time in automated headless testing -- the difference is Google
-    // Fonts: "Inter" loads over the network async (see the <link> in
-    // <head>), so a tap that lands before it's ready gets positioned
-    // against fallback-font layout, then the row text reflows (FOUT)
-    // once Inter arrives, changing the card's real height/edges out
-    // from under an arrow that was never told to recheck. A headless
-    // test with fonts already cached never hits this window. Re-running
-    // this on fonts.ready + resize (mobile browsers can also resize the
-    // viewport post-tap as the address bar collapses/expands) closes
-    // that gap regardless of which of those actually fires.
-    function positionPopover(bar) {{
-        var r = bar.getBoundingClientRect();
-        pop.classList.remove("arrow-up", "arrow-down");
-        var popWidth = pop.offsetWidth || 300;
-        // Prefer the VISUAL viewport over window.innerWidth/Height where
-        // available -- on mobile Chrome the layout viewport (what
-        // window.innerHeight reports) can be taller than what's actually
-        // visible right now (address bar covering part of it), and using
-        // the layout size here is what let the card's true bottom edge
-        // land under the toolbar instead of the real visible fold.
-        var vvw = window.visualViewport;
-        var viewW = vvw ? vvw.width : window.innerWidth;
-        var viewH = vvw ? vvw.height : window.innerHeight;
-        // 2026-08-22: clamped against the real viewport edges (with an
-        // 8px margin) instead of just the .wrap container's own bounds
-        // -- .wrap's right edge IS effectively the viewport edge on
-        // narrow phone widths, so the old clamp let the card render
-        // flush against the actual screen edge with zero breathing
-        // room, which read as "cut off" (confirmed live: a click on the
-        // rightmost/"today" bar produced exactly this). The 8px margin
-        // applies on both sides now.
-        var margin = 8;
-        var left = Math.min(
-          Math.max(r.left + r.width / 2 - popWidth / 2, margin),
-          viewW - popWidth - margin
-        );
-        // The card's own left edge can end up anywhere within that
-        // clamp range, independent of the bar's true center -- so the
-        // arrow needs its OWN position, not just "centered on the
-        // card". This is the fix for the arrow pointing at the wrong
-        // spot: it's the bar's center MINUS wherever the card actually
-        // landed, further clamped so it can't render outside the
-        // card's own rounded corners.
-        var arrowX = r.left + r.width / 2 - left;
-        arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
-        var spaceAbove = r.top;
-        var vMargin = 8;
-        pop.style.transform = "translateY(0)";
-        pop.style.bottom = "";
-        pop.style.top = "";
-        if (spaceAbove > 220) {{
-          // 2026-08-22: was `top: (r.top-12)px` + translateY(-100%) --
-          // fine for a short card, but a day with several incidents
-          // could render taller than the space actually available
-          // above the bar, pushing the card's TOP (including the date
-          // header and close button) above y=0 with no way to reach it
-          // (confirmed live).
-          //
-          // 2026-09-09: the fix above used to set BOTH top and bottom
-          // to let the browser "compute the real height as whatever
-          // fits between them" -- confirmed live this doesn't work the
-          // way that comment assumed: an absolutely-positioned box with
-          // both offsets set STRETCHES to fill that exact gap
-          // regardless of content, it doesn't shrink-to-fit for short
-          // content. A short "no downtime" card was rendering with a
-          // huge block of empty space below its two lines of text.
-          //
-          // The first single-edge fix anchored from `top: vMargin`,
-          // which pins the card to the viewport's top edge -- that's
-          // wrong here, since this branch means "there's room ABOVE
-          // the bar", so the card needs to sit just above the bar, not
-          // at the top of the screen (confirmed live: every click
-          // rendered the card in the same spot near the header,
-          // regardless of which bar was clicked). Anchoring from
-          // `bottom` instead, relative to the bar's own top edge, lets
-          // the card grow upward from just above the bar while still
-          // sizing to its actual content -- .daypop's own
-          // max-height:calc(100vh - 2rem) still caps a genuinely tall
-          // card and overflow-y:auto still scrolls internally if
-          // needed.
-          pop.style.bottom = (viewH - r.top + 12) + "px";
-          pop.classList.add("arrow-down");
-        }} else {{
-          pop.style.top = (r.bottom + 12) + "px";
-          pop.classList.add("arrow-up");
-        }}
-        pop.style.left = left + "px";
-        pop.classList.add("open");
-
-        // Arrow position is read back from the popover's ACTUAL
-        // rendered box (post-layout), not recomputed from the same
-        // top/bottom/left values used to place .daypop -- this stays
-        // correct regardless of the box's actual content height, and
-        // it's immune to internal scrolling since this element lives
-        // outside .daypop entirely (see .daypop-arrow CSS comment).
-        var popRect = pop.getBoundingClientRect();
-        popArrow.classList.remove("arrow-up", "arrow-down");
-        if (pop.classList.contains("arrow-up")) {{
-          popArrow.style.top = (popRect.top - 5) + "px";
-          popArrow.classList.add("arrow-up");
-        }} else {{
-          popArrow.style.top = (popRect.bottom - 5) + "px";
-          popArrow.classList.add("arrow-down");
-        }}
-        popArrow.style.left = (popRect.left + arrowX - 5) + "px";
-        popArrow.classList.add("open");
     }}
 
     document.querySelectorAll(".bar").forEach(function (bar) {{
@@ -1680,40 +1545,25 @@ html = f'''<!doctype html>
           body += '<div class="daypop-pct">' + pctLabel + '</div>';
         }}
         popBody.innerHTML = body;
-        positionPopover(bar);
+
+        // 2026-09-09: moves the single shared popover element into
+        // THIS bar's own .row, right after its bars strip, instead of
+        // floating it as a position:fixed overlay near the bar -- see
+        // .daypop's own CSS comment for why (three rounds of
+        // positioning bugs). Plain in-flow content needs no viewport
+        // math and can't get cut off by an edge it was never told
+        // about; scrollIntoView just makes sure the newly-opened card
+        // is actually visible after the page reflows under it.
+        bar.closest(".row").appendChild(pop);
+        pop.classList.add("open");
+        pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});
     }});
-
-    // Re-position (never re-open) if the active popover's own layout
-    // might have shifted out from under it -- see positionPopover's own
-    // comment for why fonts/resize specifically.
-    function repositionIfOpen() {{
-      if (activeBar && pop.classList.contains("open")) positionPopover(activeBar);
-    }}
-    if (document.fonts && document.fonts.ready) {{
-      document.fonts.ready.then(repositionIfOpen);
-    }}
-    window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
-    // 2026-08-22: window's own "resize" event does NOT reliably fire for
-    // Android Chrome's address-bar collapse/expand -- that's specifically
-    // what visualViewport's own separate resize event exists for (the
-    // layout viewport window.innerHeight uses and the visual viewport the
-    // user actually sees can diverge exactly while the toolbar animates).
-    // Confirmed as the live gap: a taller/scrollable popover (more likely
-    // to be open across a toolbar transition, simply by being open a bit
-    // longer while the user reads more rows) kept mispositioning even
-    // after the window-resize + fonts.ready listeners above landed, while
-    // short non-scrolling popovers were already fine. window.resize is
-    // kept too since visualViewport isn't universal (older WebKit).
-    if (window.visualViewport) {{
-      window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }});
-    }}
 
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
     document.addEventListener("click", function (e) {{
       if (pop.classList.contains("open") && !pop.contains(e.target)) closePop();
     }});
-    window.addEventListener("scroll", closePop, {{ passive: true }});
 
     // 2026-08-22: live-ticking clock -- WIB is a fixed UTC+7 offset
     // (no DST, no historical changes to account for), so computing it
@@ -2069,22 +1919,15 @@ uptime_html = f"""<!doctype html>
   .note {{ color: var(--faint); font-size: .82rem; }}
   footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
 
+  /* 2026-09-09: in-flow instead of a floating position:fixed overlay
+     -- see index.html's own .daypop comment for the full reasoning. */
   .daypop {{
-    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    display: none; margin-top: .9rem;
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
-    transform: translateY(4px); transition: opacity .12s, transform .12s;
-    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
+    box-shadow: var(--shadow); padding: 0;
+    max-height: 360px; overflow-y: auto;
   }}
-  .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
-  .daypop-arrow {{
-    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
-    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
-    opacity: 0; pointer-events: none; transition: opacity .12s;
-  }}
-  .daypop-arrow.open {{ opacity: 1; }}
-  .daypop-arrow.arrow-up {{ transform: rotate(45deg); }}
-  .daypop-arrow.arrow-down {{ transform: rotate(225deg); }}
+  .daypop.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -2138,22 +1981,19 @@ uptime_html = f"""<!doctype html>
     </div>
     <div id="daypop-body"></div>
   </div>
-  <div class="daypop-arrow" id="daypop-arrow"></div>
   <script>
-    // ── day popover -- identical interaction/positioning to the main
-    // status page's (see check_and_render.py's own comments there for
-    // the font-reflow/visualViewport reasoning); only the trigger
-    // selector (.cal-day instead of .bar) differs.
+    // ── day popover -- identical interaction to the main status page's
+    // (see check_and_render.py's own comments there); only the trigger
+    // selector (.cal-day instead of .bar) and the container it's
+    // appended into (.cal-month instead of .row) differ.
     var pop = document.getElementById("daypop");
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
-    var popArrow = document.getElementById("daypop-arrow");
     var activeCell = null;
 
     function closePop() {{
       pop.classList.remove("open");
-      popArrow.classList.remove("open");
       if (activeCell) activeCell.classList.remove("active");
       activeCell = null;
     }}
@@ -2170,52 +2010,6 @@ uptime_html = f"""<!doctype html>
       return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
              '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
              '</div><span class="daypop-row-dur">' + dur + '</span></div>';
-    }}
-
-    function positionPopover(cell) {{
-      var r = cell.getBoundingClientRect();
-      pop.classList.remove("arrow-up", "arrow-down");
-      var popWidth = pop.offsetWidth || 300;
-      var vvw = window.visualViewport;
-      var viewW = vvw ? vvw.width : window.innerWidth;
-      var viewH = vvw ? vvw.height : window.innerHeight;
-      var margin = 8;
-      var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, margin), viewW - popWidth - margin);
-      var arrowX = r.left + r.width / 2 - left;
-      arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
-      var spaceAbove = r.top;
-      var vMargin = 8;
-      pop.style.transform = "translateY(0)";
-      pop.style.bottom = "";
-      pop.style.top = "";
-      // 2026-09-09: single-edge anchor, see index.html's own version of
-      // this function for the full reasoning -- setting both top AND
-      // bottom stretches the box to fill that exact gap even for short
-      // content, instead of sizing to it. .daypop's own max-height CSS
-      // still caps a genuinely tall card. The edge used must be
-      // relative to the bar (r.top/r.bottom), not a flat vMargin off
-      // the viewport -- anchoring to the viewport pins the card to the
-      // same spot regardless of which day was clicked.
-      if (spaceAbove > 220) {{
-        pop.style.bottom = (viewH - r.top + 12) + "px";
-        pop.classList.add("arrow-down");
-      }} else {{
-        pop.style.top = (r.bottom + 12) + "px";
-        pop.classList.add("arrow-up");
-      }}
-      pop.style.left = left + "px";
-      pop.classList.add("open");
-      var popRect = pop.getBoundingClientRect();
-      popArrow.classList.remove("arrow-up", "arrow-down");
-      if (pop.classList.contains("arrow-up")) {{
-        popArrow.style.top = (popRect.top - 5) + "px";
-        popArrow.classList.add("arrow-up");
-      }} else {{
-        popArrow.style.top = (popRect.bottom - 5) + "px";
-        popArrow.classList.add("arrow-down");
-      }}
-      popArrow.style.left = (popRect.left + arrowX - 5) + "px";
-      popArrow.classList.add("open");
     }}
 
     function openDayCell(cell) {{
@@ -2239,7 +2033,16 @@ uptime_html = f"""<!doctype html>
         body += '<div class="daypop-pct">Aktif ' + cell.dataset.pct + '%</div>';
       }}
       popBody.innerHTML = body;
-      positionPopover(cell);
+      // 2026-09-09: in-flow instead of a floating overlay, see
+      // index.html's own version of this handler for the full
+      // reasoning. Appended into the clicked cell's own .cal-month
+      // (right after its grid) rather than into the grid itself,
+      // since .cal-grid is a CSS grid container and appending a
+      // full-width card as one more grid item would fight the
+      // 7-column layout.
+      cell.closest(".cal-month").appendChild(pop);
+      pop.classList.add("open");
+      pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
     }}
 
     document.getElementById("cal-container").addEventListener("click", function (e) {{
@@ -2247,13 +2050,8 @@ uptime_html = f"""<!doctype html>
       if (cell) {{ e.stopPropagation(); openDayCell(cell); }}
     }});
 
-    function repositionIfOpen() {{ if (activeCell && pop.classList.contains("open")) positionPopover(activeCell); }}
-    if (document.fonts && document.fonts.ready) {{ document.fonts.ready.then(repositionIfOpen); }}
-    window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
-    if (window.visualViewport) {{ window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }}); }}
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
     document.addEventListener("click", function (e) {{ if (pop.classList.contains("open") && !pop.contains(e.target)) closePop(); }});
-    window.addEventListener("scroll", closePop, {{ passive: true }});
 
     // ── broker dropdown + 3-month sliding window ────────────────────────
     var brokerSelect = document.getElementById("broker-select");

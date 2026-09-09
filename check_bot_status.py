@@ -674,22 +674,16 @@ html = f'''<!doctype html>
   .bar.nodata {{ background: var(--border); }}
   .bar:hover, .bar.active {{ opacity: 1; transform: scaleY(1.06); }}
 
+  /* 2026-09-09: in-flow instead of a floating position:fixed overlay
+     -- see mqtt-status-repo's check_and_render.py own .daypop comment
+     for the full reasoning. */
   .daypop {{
-    position: fixed; z-index: 40; width: min(300px, calc(100vw - 2rem));
+    display: none; margin-top: .9rem;
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: var(--shadow); opacity: 0; pointer-events: none;
-    transform: translateY(4px); transition: opacity .12s, transform .12s;
-    max-height: calc(100vh - 2rem); overflow-y: auto; padding: 0;
+    box-shadow: var(--shadow); padding: 0;
+    max-height: 360px; overflow-y: auto;
   }}
-  .daypop.open {{ opacity: 1; pointer-events: auto; transform: translateY(0); }}
-  .daypop-arrow {{
-    position: fixed; z-index: 41; width: 10px; height: 10px; background: var(--surf2);
-    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
-    opacity: 0; pointer-events: none; transition: opacity .12s;
-  }}
-  .daypop-arrow.open {{ opacity: 1; }}
-  .daypop-arrow.arrow-up {{ transform: rotate(45deg); }}
-  .daypop-arrow.arrow-down {{ transform: rotate(225deg); }}
+  .daypop.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -759,18 +753,15 @@ html = f'''<!doctype html>
     </div>
     <div id="daypop-body"></div>
   </div>
-  <div class="daypop-arrow" id="daypop-arrow"></div>
   <script>
     var pop = document.getElementById("daypop");
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
-    var popArrow = document.getElementById("daypop-arrow");
     var activeBar = null;
 
     function closePop() {{
       pop.classList.remove("open");
-      popArrow.classList.remove("open");
       if (activeBar) activeBar.classList.remove("active");
       activeBar = null;
     }}
@@ -786,54 +777,6 @@ html = f'''<!doctype html>
       return '<div class="daypop-row ' + kind + '"><span class="daypop-row-icon">' + icon +
              '</span><div class="daypop-row-main"><span class="daypop-row-label">' + label + '</span>' + timeRange +
              '</div><span class="daypop-row-dur">' + dur + '</span></div>';
-    }}
-
-    function positionPopover(bar) {{
-      var r = bar.getBoundingClientRect();
-      pop.classList.remove("arrow-up", "arrow-down");
-      var popWidth = pop.offsetWidth || 300;
-      var vvw = window.visualViewport;
-      var viewW = vvw ? vvw.width : window.innerWidth;
-      var viewH = vvw ? vvw.height : window.innerHeight;
-      var margin = 8;
-      var left = Math.min(Math.max(r.left + r.width / 2 - popWidth / 2, margin), viewW - popWidth - margin);
-      var arrowX = r.left + r.width / 2 - left;
-      arrowX = Math.min(Math.max(arrowX, 16), popWidth - 16);
-      var spaceAbove = r.top;
-      var vMargin = 8;
-      pop.style.transform = "translateY(0)";
-      pop.style.top = "";
-      pop.style.bottom = "";
-      // Single-edge anchor, relative to the bar -- setting both top AND
-      // bottom stretches the box to fill that exact gap even for short
-      // content instead of sizing to it (a short "no incident" card
-      // rendered with a large empty area below its text). Anchoring
-      // from just one edge -- bottom (relative to the bar's own top)
-      // when there's room above, top (relative to the bar's own
-      // bottom) otherwise -- lets the card size to its actual content
-      // while still sitting next to the bar that was clicked, not
-      // pinned to a fixed viewport offset. .daypop's own
-      // max-height:calc(100vh - 2rem) still caps a genuinely tall card.
-      if (spaceAbove > 220) {{
-        pop.style.bottom = (viewH - r.top + 12) + "px";
-        pop.classList.add("arrow-down");
-      }} else {{
-        pop.style.top = (r.bottom + 12) + "px";
-        pop.classList.add("arrow-up");
-      }}
-      pop.style.left = left + "px";
-      pop.classList.add("open");
-      var popRect = pop.getBoundingClientRect();
-      popArrow.classList.remove("arrow-up", "arrow-down");
-      if (pop.classList.contains("arrow-up")) {{
-        popArrow.style.top = (popRect.top - 5) + "px";
-        popArrow.classList.add("arrow-up");
-      }} else {{
-        popArrow.style.top = (popRect.bottom - 5) + "px";
-        popArrow.classList.add("arrow-down");
-      }}
-      popArrow.style.left = (popRect.left + arrowX - 5) + "px";
-      popArrow.classList.add("open");
     }}
 
     document.querySelectorAll(".bar").forEach(function (bar) {{
@@ -863,18 +806,17 @@ html = f'''<!doctype html>
           body += '<div class="daypop-pct">' + pctLabel + '</div>';
         }}
         popBody.innerHTML = body;
-        positionPopover(bar);
+        // 2026-09-09: in-flow instead of a floating overlay -- see
+        // mqtt-status-repo's check_and_render.py for the full
+        // reasoning behind this change.
+        bar.closest(".row").appendChild(pop);
+        pop.classList.add("open");
+        pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});
     }});
 
-    function repositionIfOpen() {{ if (activeBar && pop.classList.contains("open")) positionPopover(activeBar); }}
-    if (document.fonts && document.fonts.ready) {{ document.fonts.ready.then(repositionIfOpen); }}
-    window.addEventListener("resize", repositionIfOpen, {{ passive: true }});
-    if (window.visualViewport) {{ window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }}); }}
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
-
     document.addEventListener("click", function (e) {{ if (pop.classList.contains("open") && !pop.contains(e.target)) closePop(); }});
-    window.addEventListener("scroll", closePop, {{ passive: true }});
 
     var liveClock = document.getElementById("live-clock");
     function tickClock() {{
