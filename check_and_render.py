@@ -1593,17 +1593,24 @@ html = f'''<!doctype html>
           // regardless of content, it doesn't shrink-to-fit for short
           // content. A short "no downtime" card was rendering with a
           // huge block of empty space below its two lines of text.
-          // Anchoring from a SINGLE edge (top only here) lets the box
-          // size to its actual content, while .daypop's own
-          // max-height:calc(100vh - 2rem) (unrelated to this offset,
-          // already there) still caps a genuinely tall card and
-          // overflow-y:auto still scrolls internally if it's tall
-          // enough to need it -- same overflow-safety, without forcing
-          // short content to stretch.
-          pop.style.top = vMargin + "px";
+          //
+          // The first single-edge fix anchored from `top: vMargin`,
+          // which pins the card to the viewport's top edge -- that's
+          // wrong here, since this branch means "there's room ABOVE
+          // the bar", so the card needs to sit just above the bar, not
+          // at the top of the screen (confirmed live: every click
+          // rendered the card in the same spot near the header,
+          // regardless of which bar was clicked). Anchoring from
+          // `bottom` instead, relative to the bar's own top edge, lets
+          // the card grow upward from just above the bar while still
+          // sizing to its actual content -- .daypop's own
+          // max-height:calc(100vh - 2rem) still caps a genuinely tall
+          // card and overflow-y:auto still scrolls internally if
+          // needed.
+          pop.style.bottom = (viewH - r.top + 12) + "px";
           pop.classList.add("arrow-down");
         }} else {{
-          pop.style.bottom = vMargin + "px";
+          pop.style.top = (r.bottom + 12) + "px";
           pop.classList.add("arrow-up");
         }}
         pop.style.left = left + "px";
@@ -2180,12 +2187,15 @@ uptime_html = f"""<!doctype html>
       // this function for the full reasoning -- setting both top AND
       // bottom stretches the box to fill that exact gap even for short
       // content, instead of sizing to it. .daypop's own max-height CSS
-      // still caps a genuinely tall card.
+      // still caps a genuinely tall card. The edge used must be
+      // relative to the bar (r.top/r.bottom), not a flat vMargin off
+      // the viewport -- anchoring to the viewport pins the card to the
+      // same spot regardless of which day was clicked.
       if (spaceAbove > 220) {{
-        pop.style.top = vMargin + "px";
+        pop.style.bottom = (viewH - r.top + 12) + "px";
         pop.classList.add("arrow-down");
       }} else {{
-        pop.style.bottom = vMargin + "px";
+        pop.style.top = (r.bottom + 12) + "px";
         pop.classList.add("arrow-up");
       }}
       pop.style.left = left + "px";
