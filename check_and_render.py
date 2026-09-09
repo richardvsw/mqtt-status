@@ -1420,7 +1420,6 @@ html = f'''<!doctype html>
   .uptime-link a:hover {{ text-decoration: underline; }}
 
   .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
-  .endpoint-note {{ text-align: left; max-width: none; margin: -.5rem 0 .8rem; }}
   .incident-log {{
     background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); overflow: hidden;
@@ -1485,7 +1484,6 @@ html = f'''<!doctype html>
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
     </div>
     <h2 class="section-title">Endpoint DNS Failover</h2>
-    <p class="note endpoint-note">{ALIAS_HOST} bukan broker tersendiri — ini adalah alias DNS yang mengarah ke salah satu dari {total} node cluster di atas. Dipantau terpisah karena ini alamat yang benar-benar dipakai oleh perangkat di lapangan.</p>
     <div class="panel">{alias_row}</div>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
