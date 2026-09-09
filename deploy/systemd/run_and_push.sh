@@ -73,13 +73,16 @@ export BOT_LONG_NAME
 
 python3 check_and_render.py
 
-# 2026-08-22: bot-status.html (mesh_bot/meshtasticd service uptime) --
-# only THIS side can actually check them (local systemd + local API,
-# neither reachable from GitHub Actions). See check_bot_status.py's own
-# docstring for the full LXC-vs-Actions split.
-python3 check_bot_status.py
+# 2026-09-09: used to also run check_bot_status.py here -- dropped once
+# that script's 2026-09-04 rewrite made it hit meshbot.rivi.my.id's
+# public HTTP API unconditionally instead of checking local systemd/API
+# state directly (see its own docstring). That means it now behaves
+# identically wherever it runs, so running it a second time here just
+# duplicated exactly what check-status.yml's own unconditional "Commit
+# bot status" step already does every ~10 min from Actions -- no local
+# advantage left to justify the extra load on this box.
 
-git add index.html history state.json log.jsonl brokers.json notice.json bot-status.html bot_history bot_state.json bot_log.jsonl
+git add index.html history state.json log.jsonl brokers.json notice.json
 if git diff --cached --quiet; then
     echo "mqtt-status-lxc: no changes to publish"
 else
