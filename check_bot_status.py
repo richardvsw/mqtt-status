@@ -641,6 +641,7 @@ html = f'''<!doctype html>
 
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
   .titlebar {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }}
+  .titlebar .glyph {{ width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }}
   .titlebar h1 {{ flex: 1; font-size: 1.2rem; font-weight: 650; margin: 0; letter-spacing: -.2px; }}
   .live-clock {{
     font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted);
@@ -742,6 +743,7 @@ html = f'''<!doctype html>
   <div class="wrap">
     <a class="back" href="index.html">← Status broker MQTT</a>
     <div class="titlebar">
+      <img class="glyph" src="assets/riv-meshbot-logo.png" alt="RiV-meshBot">
       <h1>Status Bot — RiV-meshBot</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
