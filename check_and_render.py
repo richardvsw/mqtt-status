@@ -1394,24 +1394,12 @@ html = f'''<!doctype html>
   .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 
   .bars-caption {{ display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: .72rem; margin-top: 1.1rem; }}
-  /* 2026-09-09: used to repeat "{HISTORY_DAYS} hari lalu ... Hari ini"
-     once more here, below a panel where every single row already shows
-     that exact same pair right under its own bars -- confirmed
-     redundant/unused. Only the color-meaning legend itself was new
-     information at this position, so that's all that's left. */
-  .legend-standalone {{ display: flex; justify-content: center; margin-top: 1.1rem; font-size: .72rem; color: var(--faint); }}
   /* Per-row variant (status.claude.com's own "30 days ago —— 99.22%
      uptime —— Today" line, one under each service's bar strip) --
      tighter than the page-level .bars-caption since there's now one of
      these per broker, not just one at the very bottom. */
   .row-caption {{ margin-top: .5rem; font-size: .68rem; gap: .5rem; }}
   .caption-line {{ flex: 1; height: 1px; background: var(--border); min-width: 1.2rem; }}
-  .legend {{ display: flex; align-items: center; gap: 1rem; }}
-  .legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
-  .legend i {{ width: 8px; height: 8px; border-radius: 2px; display: inline-block; }}
-  .legend .lg-up {{ background: var(--ok); }}
-  .legend .lg-warn {{ background: var(--warn); }}
-  .legend .lg-down {{ background: var(--crit); }}
 
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
   .uptime-link {{ text-align: center; margin: -1.2rem 0 1.8rem; font-size: .8rem; }}
@@ -1480,9 +1468,6 @@ html = f'''<!doctype html>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
-    <div class="legend-standalone">
-      <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
-    </div>
     <h2 class="section-title">Endpoint DNS Failover</h2>
     <div class="panel">{alias_row}</div>
     <h2 class="section-title">Riwayat Insiden</h2>
