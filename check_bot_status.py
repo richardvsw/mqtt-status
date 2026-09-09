@@ -684,6 +684,13 @@ html = f'''<!doctype html>
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
+  .daypop-caret {{
+    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    background: var(--surf2); border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border); transform: rotate(45deg);
+    position: relative; z-index: 1;
+  }}
+  .daypop-caret.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -746,6 +753,7 @@ html = f'''<!doctype html>
     {_event_log_html()}
     <footer>Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
+  <div class="daypop-caret" id="daypop-caret"></div>
   <div class="daypop" id="daypop">
     <div class="daypop-head">
       <span class="daypop-date" id="daypop-date"></span>
@@ -758,10 +766,12 @@ html = f'''<!doctype html>
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
+    var popCaret = document.getElementById("daypop-caret");
     var activeBar = null;
 
     function closePop() {{
       pop.classList.remove("open");
+      popCaret.classList.remove("open");
       if (activeBar) activeBar.classList.remove("active");
       activeBar = null;
     }}
@@ -809,7 +819,10 @@ html = f'''<!doctype html>
         // 2026-09-09: in-flow instead of a floating overlay -- see
         // mqtt-status-repo's check_and_render.py for the full
         // reasoning behind this change.
-        bar.closest(".row").appendChild(pop);
+        var row = bar.closest(".row");
+        row.appendChild(popCaret);
+        row.appendChild(pop);
+        popCaret.classList.add("open");
         pop.classList.add("open");
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});

@@ -1330,8 +1330,11 @@ html = f'''<!doctype html>
      in-flow block instead: JS moves this single shared element into the
      clicked bar's own .row, right after its bars strip, so it just
      appears directly under that row like any other page content --
-     no viewport math, no arrow element, no repositioning on
-     resize/scroll/font-load needed at all. */
+     no viewport math, no repositioning on resize/scroll/font-load
+     needed at all -- but the card no longer visually points at any
+     one bar (it spans the whole row), so a small static caret sits
+     between the bars and the card instead, just to read as "this
+     belongs to the row above" rather than a disconnected block. */
   .daypop {{
     display: none; margin-top: .9rem;
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
@@ -1339,6 +1342,18 @@ html = f'''<!doctype html>
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
+  /* Plain in-flow diamond, not a floating/positioned element -- JS
+     moves it right before .daypop in the same .row so it always sits
+     directly above the card, no coordinates needed. Sits outside
+     .daypop's own box (not a pseudo-element of it) so it's never
+     clipped by .daypop's overflow-y:auto. */
+  .daypop-caret {{
+    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    background: var(--surf2); border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border); transform: rotate(45deg);
+    position: relative; z-index: 1;
+  }}
+  .daypop-caret.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -1461,6 +1476,7 @@ html = f'''<!doctype html>
       Commit {commit_sha} · Diperbarui {updated_str} · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a>
     </footer>
   </div>
+  <div class="daypop-caret" id="daypop-caret"></div>
   <div class="daypop" id="daypop">
     <div class="daypop-head">
       <span class="daypop-date" id="daypop-date"></span>
@@ -1475,6 +1491,7 @@ html = f'''<!doctype html>
     // than one kind of incident (a real Down AND a separate Auth Ditolak
     // period) that a single tooltip line can't represent cleanly.
     var pop = document.getElementById("daypop");
+    var popCaret = document.getElementById("daypop-caret");
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
@@ -1482,6 +1499,7 @@ html = f'''<!doctype html>
 
     function closePop() {{
       pop.classList.remove("open");
+      popCaret.classList.remove("open");
       if (activeBar) activeBar.classList.remove("active");
       activeBar = null;
     }}
@@ -1554,7 +1572,10 @@ html = f'''<!doctype html>
         // math and can't get cut off by an edge it was never told
         // about; scrollIntoView just makes sure the newly-opened card
         // is actually visible after the page reflows under it.
-        bar.closest(".row").appendChild(pop);
+        var row = bar.closest(".row");
+        row.appendChild(popCaret);
+        row.appendChild(pop);
+        popCaret.classList.add("open");
         pop.classList.add("open");
         pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }});
@@ -1928,6 +1949,13 @@ uptime_html = f"""<!doctype html>
     max-height: 360px; overflow-y: auto;
   }}
   .daypop.open {{ display: block; }}
+  .daypop-caret {{
+    display: none; width: 12px; height: 12px; margin: .9rem auto -6px;
+    background: var(--surf2); border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border); transform: rotate(45deg);
+    position: relative; z-index: 1;
+  }}
+  .daypop-caret.open {{ display: block; }}
   .daypop-head {{
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; background: var(--surf2); z-index: 1;
@@ -1974,6 +2002,7 @@ uptime_html = f"""<!doctype html>
     <div id="cal-container">{_broker_sections}</div>
     <footer>Diperbarui {uptime_updated_str}</footer>
   </div>
+  <div class="daypop-caret" id="daypop-caret"></div>
   <div class="daypop" id="daypop">
     <div class="daypop-head">
       <span class="daypop-date" id="daypop-date"></span>
@@ -1987,6 +2016,7 @@ uptime_html = f"""<!doctype html>
     // selector (.cal-day instead of .bar) and the container it's
     // appended into (.cal-month instead of .row) differ.
     var pop = document.getElementById("daypop");
+    var popCaret = document.getElementById("daypop-caret");
     var popDate = document.getElementById("daypop-date");
     var popBody = document.getElementById("daypop-body");
     var popClose = document.getElementById("daypop-close");
@@ -1994,6 +2024,7 @@ uptime_html = f"""<!doctype html>
 
     function closePop() {{
       pop.classList.remove("open");
+      popCaret.classList.remove("open");
       if (activeCell) activeCell.classList.remove("active");
       activeCell = null;
     }}
@@ -2040,7 +2071,10 @@ uptime_html = f"""<!doctype html>
       // since .cal-grid is a CSS grid container and appending a
       // full-width card as one more grid item would fight the
       // 7-column layout.
-      cell.closest(".cal-month").appendChild(pop);
+      var month = cell.closest(".cal-month");
+      month.appendChild(popCaret);
+      month.appendChild(pop);
+      popCaret.classList.add("open");
       pop.classList.add("open");
       pop.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
     }}
