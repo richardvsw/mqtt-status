@@ -982,22 +982,90 @@ for host in BROKERS:
 # not just the bar-strip summary. Reuses REAL_INCIDENTS (already built
 # for the day-popovers) rather than a separate data source, and reuses
 # _clip_incidents_to_day so a single multi-day outage still splits at
-# midnight the same way it does in the popovers. Days with zero
-# incidents across every broker are skipped entirely rather than
-# padded with "no incidents" filler -- with 6 brokers over 30 days,
-# an exhaustive per-day list (like Claude's) would mostly be noise;
-# only days something actually happened are worth showing here.
+# midnight the same way it does in the popovers.
+#
+# 2026-09-09: every day is now listed, including clean ones (explicit
+# "Tidak ada insiden dilaporkan" line) -- matches status.claude.com's
+# own history page exactly, per direct request. A clean day renders as
+# a plain non-expandable line (nothing to expand), so this doesn't
+# actually add the visual weight a full collapsible row per clean day
+# would.
 incident_days = []
 for d in reversed(day_labels):
     day_entries = []
     for host in BROKERS:
         for inc in _clip_incidents_to_day(host, d):
             day_entries.append({"host": host, **inc})
-    if day_entries:
-        day_entries.sort(key=lambda e: e["start_clock"])
-        incident_days.append((d, day_entries))
+    day_entries.sort(key=lambda e: e["start_clock"])
+    incident_days.append((d, day_entries))
 
 incident_kind_icon = {"down": "✕", "autherr": "⚠"}
+
+
+def _render_incident_day_block(d, entries):
+    """Renders one day's block for the incident log -- shared between
+    index.html's 30-day view and incidents.html's full-history view
+    (2026-09-09) so the two pages can't drift apart in how a day looks.
+    A clean day is a plain non-expandable line (nothing to expand); a
+    day with real incidents is a collapsible <details> block, grouped
+    by host (2026-08-24: a bad day flapping across 6 brokers interleaved
+    rows so tightly it was hard to follow any ONE broker's own story --
+    groups ordered by each host's first incident that day, so the day
+    still roughly reads left-to-right chronologically at the group
+    level; each group's own rows stay chronological)."""
+    if not entries:
+        return f'''
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">{d}</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>'''
+    by_host = {}
+    host_order = []
+    for e in entries:
+        if e["host"] not in by_host:
+            by_host[e["host"]] = []
+            host_order.append(e["host"])
+        by_host[e["host"]].append(e)
+    group_blocks = []
+    for host in host_order:
+        host_entries = by_host[host]
+        host_rows = "".join(
+            f'''<div class="incident-row">
+              <span class="incident-icon {e["kind"]}">{incident_kind_icon.get(e["kind"], "✕")}</span>
+              <span class="incident-label">{e["label"]}</span>
+              <span class="incident-time">{e["start_clock"]}–{e["end_clock"]} WIB</span>
+            </div>'''
+            for e in host_entries
+        )
+        n_down = sum(1 for e in host_entries if e["kind"] == "down")
+        n_auth = sum(1 for e in host_entries if e["kind"] == "autherr")
+        parts = []
+        if n_down:
+            parts.append(f"{n_down} down")
+        if n_auth:
+            parts.append(f"{n_auth} auth ditolak")
+        dot_kind = "down" if n_down else "autherr"
+        group_blocks.append(f'''
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot {dot_kind}"></span>
+                <span class="incident-host">{host}</span>
+                <span class="incident-host-count">{" · ".join(parts)}</span>
+              </div>
+              {host_rows}
+            </div>''')
+    rows_html = "".join(group_blocks)
+    n_hosts = len(host_order)
+    summary_text = f"{len(entries)} insiden · {n_hosts} broker terdampak"
+    return f'''
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">{d}</span>
+            <span class="incident-count">{summary_text}</span>
+          </summary>
+          <div class="incident-rows">{rows_html}</div>
+        </details>'''
 
 
 def _incident_log_html():
@@ -1007,64 +1075,7 @@ def _incident_log_html():
     # keyboard-accessible for free), showing just a count + which brokers
     # were affected. Clicking a day expands the full row list, same as
     # before.
-    if not incident_days:
-        return '<p class="note">Tidak ada insiden tercatat dalam 30 hari terakhir.</p>'
-    blocks = []
-    for d, entries in incident_days:
-        # 2026-08-24: grouped by host instead of one flat chronological
-        # list -- a bad day flapping across 6 brokers interleaved their
-        # rows so tightly it was hard to follow any ONE broker's own
-        # story. Groups ordered by each host's first incident that day,
-        # so the day still roughly reads left-to-right chronologically
-        # at the group level; each group's own rows stay chronological.
-        by_host = {}
-        host_order = []
-        for e in entries:
-            if e["host"] not in by_host:
-                by_host[e["host"]] = []
-                host_order.append(e["host"])
-            by_host[e["host"]].append(e)
-        group_blocks = []
-        for host in host_order:
-            host_entries = by_host[host]
-            host_rows = "".join(
-                f'''<div class="incident-row">
-              <span class="incident-icon {e["kind"]}">{incident_kind_icon.get(e["kind"], "✕")}</span>
-              <span class="incident-label">{e["label"]}</span>
-              <span class="incident-time">{e["start_clock"]}–{e["end_clock"]} WIB</span>
-            </div>'''
-                for e in host_entries
-            )
-            n_down = sum(1 for e in host_entries if e["kind"] == "down")
-            n_auth = sum(1 for e in host_entries if e["kind"] == "autherr")
-            parts = []
-            if n_down:
-                parts.append(f"{n_down} down")
-            if n_auth:
-                parts.append(f"{n_auth} auth ditolak")
-            dot_kind = "down" if n_down else "autherr"
-            group_blocks.append(f'''
-            <div class="incident-host-group">
-              <div class="incident-host-header">
-                <span class="dot {dot_kind}"></span>
-                <span class="incident-host">{host}</span>
-                <span class="incident-host-count">{" · ".join(parts)}</span>
-              </div>
-              {host_rows}
-            </div>''')
-        rows_html = "".join(group_blocks)
-        n_hosts = len(host_order)
-        summary_text = f"{len(entries)} insiden · {n_hosts} broker terdampak"
-        blocks.append(f'''
-        <details class="incident-day">
-          <summary class="incident-summary">
-            <span class="incident-chevron">▸</span>
-            <span class="incident-date">{d}</span>
-            <span class="incident-count">{summary_text}</span>
-          </summary>
-          <div class="incident-rows">{rows_html}</div>
-        </details>''')
-    return "".join(blocks)
+    return "".join(_render_incident_day_block(d, entries) for d, entries in incident_days)
 
 
 total = len(BROKERS)
@@ -1343,7 +1354,12 @@ html = f'''<!doctype html>
   .daypop-row:last-child {{ margin-bottom: 0; }}
   .daypop-row.down {{ background: var(--crit-bg); color: var(--crit); }}
   .daypop-row.autherr {{ background: var(--warn-bg); color: var(--warn); }}
-  .daypop-row.ok {{ background: var(--ok-bg); color: var(--ok); }}
+  /* 2026-09-09: a clean day no longer gets the colored pill treatment
+     the incident rows above use -- confirmed the green box + checkmark
+     read as trying too hard for what is genuinely just "there was
+     nothing here," where status.claude.com own reference simply
+     states that in plain text on the card own normal background. */
+  .daypop-empty {{ padding: .3rem .1rem .5rem; color: var(--muted); font-size: .84rem; }}
   .daypop-row-icon {{ flex-shrink: 0; }}
   .daypop-row-main {{ flex: 1; min-width: 0; }}
   .daypop-row-label {{ font-weight: 600; }}
@@ -1386,6 +1402,15 @@ html = f'''<!doctype html>
   .incident-day {{ border-bottom: 1px solid var(--border-soft); }}
   .incident-day:last-child {{ border-bottom: none; }}
   .incident-day[open] > .incident-summary .incident-chevron {{ transform: rotate(90deg); }}
+  /* Plain line for a clean day -- no <details>, so no chevron/click
+     affordance/hover state; same padding as .incident-summary so it
+     lines up with the expandable rows above/below it. */
+  .incident-day-empty {{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1.1rem; color: var(--faint);
+  }}
+  .incident-day-empty .incident-date {{ color: var(--faint); font-weight: 600; }}
+  .incident-day-empty .incident-count {{ font-size: .76rem; }}
   .incident-summary {{
     display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
     cursor: pointer; list-style: none; user-select: none;
@@ -1428,7 +1453,7 @@ html = f'''<!doctype html>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
-    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
+    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="incidents.html">Riwayat insiden lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="legend-standalone">
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
@@ -1604,18 +1629,14 @@ html = f'''<!doctype html>
 
         var body = "";
         if (incidents.length === 0) {{
-          // 2026-08-22: this branch used to hardcode the green "ok"
-          // style/checkmark regardless of the real status -- confirmed
-          // live on mqtt5.meshnode.id: its very first-ever check failed
-          // (0% up that day), but since REAL_INCIDENTS only records a
-          // CONFIRMED outage (2 consecutive fails) and this was only 1,
-          // there was no incident to show, and the fallback showed a
-          // green checkmark + "no details" as if it were healthy. The
-          // icon/color now matches bar.dataset.status (the same value
-          // that colors the bar itself), so a red/down day can't render
-          // a green "no details available" row.
-          body = '<div class="daypop-row ok"><span class="daypop-row-icon">✓</span>' +
-                 '<span class="daypop-row-label">Beroperasi Normal</span></div>';
+          // 2026-09-09: plain neutral text instead of a green
+          // checkmark pill -- also fixes the 2026-08-22 case this used
+          // to special-case (mqtt5's very first check failing, 0% that
+          // day, but not yet a CONFIRMED outage so REAL_INCIDENTS had
+          // nothing to show): "no downtime recorded" is accurate either
+          // way without needing to imply "healthy," so the color-match
+          // workaround that fix required isn't needed anymore either.
+          body = '<div class="daypop-empty">Tidak ada downtime tercatat pada hari ini.</div>';
         }} else {{
           incidents.forEach(function (inc) {{
             body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock);
@@ -2052,7 +2073,12 @@ uptime_html = f"""<!doctype html>
   .daypop-row:last-child {{ margin-bottom: 0; }}
   .daypop-row.down {{ background: var(--crit-bg); color: var(--crit); }}
   .daypop-row.autherr {{ background: var(--warn-bg); color: var(--warn); }}
-  .daypop-row.ok {{ background: var(--ok-bg); color: var(--ok); }}
+  /* 2026-09-09: a clean day no longer gets the colored pill treatment
+     the incident rows above use -- confirmed the green box + checkmark
+     read as trying too hard for what is genuinely just "there was
+     nothing here," where status.claude.com own reference simply
+     states that in plain text on the card own normal background. */
+  .daypop-empty {{ padding: .3rem .1rem .5rem; color: var(--muted); font-size: .84rem; }}
   .daypop-row-icon {{ flex-shrink: 0; }}
   .daypop-row-main {{ flex: 1; min-width: 0; }}
   .daypop-row-label {{ font-weight: 600; }}
@@ -2166,8 +2192,7 @@ uptime_html = f"""<!doctype html>
       try {{ incidents = JSON.parse(cell.dataset.incidents || "[]"); }} catch (err) {{ incidents = []; }}
       var body = "";
       if (incidents.length === 0) {{
-        body = '<div class="daypop-row ok"><span class="daypop-row-icon">✓</span>' +
-               '<span class="daypop-row-label">Beroperasi Normal</span></div>';
+        body = '<div class="daypop-empty">Tidak ada downtime tercatat pada hari ini.</div>';
       }} else {{
         incidents.forEach(function (inc) {{ body += rowHtml(inc.kind, inc.label, inc.seconds, inc.start_clock, inc.end_clock); }});
       }}
@@ -2245,3 +2270,141 @@ uptime_html = f"""<!doctype html>
 with open(UPTIME_OUT_PATH, "w") as f:
     f.write(uptime_html)
 print(f"wrote {UPTIME_OUT_PATH}")
+
+# 2026-09-09: full incident history, one page, per direct request to
+# match status.claude.com's own /history page -- every day over the
+# full LOG_RETENTION_DAYS window (not just the main page's 30-day
+# view), grouped by month. No prev/next pagination needed the way
+# uptime.html's calendar has it -- at 90 days that's only ~3 months
+# stacked, nowhere near the ~13 months of calendar data that page has
+# to window through.
+INCIDENTS_OUT_PATH = "incidents.html"
+_full_day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strftime("%Y-%m-%d")
+                     for i in range(LOG_RETENTION_DAYS - 1, -1, -1)]
+_full_incident_days = []
+for d in reversed(_full_day_labels):
+    _entries = []
+    for host in BROKERS:
+        for inc in _clip_incidents_to_day(host, d):
+            _entries.append({"host": host, **inc})
+    _entries.sort(key=lambda e: e["start_clock"])
+    _full_incident_days.append((d, _entries))
+
+_INDO_MONTH = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+               "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+_months_html = []
+_cur_month_key = None
+_cur_month_days = []
+
+
+def _flush_month():
+    if _cur_month_key is None:
+        return
+    yy, mm = _cur_month_key.split("-")
+    heading = f"{_INDO_MONTH[int(mm)]} {yy}"
+    days_html = "".join(_render_incident_day_block(d, e) for d, e in _cur_month_days)
+    _months_html.append(f'''
+    <h2 class="section-title">{heading}</h2>
+    <div class="incident-log">{days_html}</div>''')
+
+
+for _d, _entries in _full_incident_days:
+    _month_key = _d[:7]
+    if _month_key != _cur_month_key:
+        _flush_month()
+        _cur_month_key = _month_key
+        _cur_month_days = []
+    _cur_month_days.append((_d, _entries))
+_flush_month()
+
+incidents_html = f"""<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Insiden — MQTT Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
+    --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
+    --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
+    --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
+  }}
+  html {{ color-scheme: light; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }}
+  .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
+  h1 {{ font-size: 1.15rem; font-weight: 650; margin: .8rem 0 .3rem; }}
+  .back {{ color: var(--accent); text-decoration: none; font-size: .85rem; }}
+  .back:hover {{ text-decoration: underline; }}
+  .dot {{ position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }}
+  .dot.down {{ background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }}
+  .dot.autherr {{ background: var(--warn); box-shadow: 0 0 0 3px var(--warn-dim); }}
+  .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
+  .incident-log {{
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }}
+  .incident-day {{ border-bottom: 1px solid var(--border-soft); }}
+  .incident-day:last-child {{ border-bottom: none; }}
+  .incident-day[open] > .incident-summary .incident-chevron {{ transform: rotate(90deg); }}
+  .incident-day-empty {{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1.1rem; color: var(--faint);
+  }}
+  .incident-day-empty .incident-date {{ color: var(--faint); font-weight: 600; }}
+  .incident-day-empty .incident-count {{ font-size: .76rem; }}
+  .incident-summary {{
+    display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
+    cursor: pointer; list-style: none; user-select: none;
+  }}
+  .incident-summary::-webkit-details-marker {{ display: none; }}
+  .incident-summary:hover {{ background: var(--border-soft); }}
+  .incident-chevron {{ color: var(--faint); font-size: .7rem; transition: transform .12s; flex-shrink: 0; }}
+  .incident-date {{ font-weight: 600; font-size: .82rem; }}
+  .incident-count {{ color: var(--faint); font-size: .76rem; margin-left: auto; }}
+  .incident-rows {{ padding: 0 1.1rem 1rem; }}
+  .incident-host-group {{ border-top: 1px solid var(--border-soft); padding-top: .55rem; margin-top: .55rem; }}
+  .incident-host-group:first-child {{ border-top: none; padding-top: 0; margin-top: 0; }}
+  .incident-host-header {{ display: flex; align-items: baseline; gap: .5rem; margin-bottom: .1rem; }}
+  .incident-host-count {{ color: var(--faint); font-size: .68rem; margin-left: auto; }}
+  .incident-row {{
+    display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
+    padding: .4rem 0 .4rem 1.3rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-soft);
+  }}
+  .incident-row:last-child {{ border-bottom: none; }}
+  .incident-icon {{ flex-shrink: 0; font-size: .7rem; }}
+  .incident-icon.down {{ color: var(--crit); }}
+  .incident-icon.autherr {{ color: var(--warn); }}
+  .incident-host {{ font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); font-weight: 650; font-size: .76rem; flex-shrink: 0; }}
+  .incident-label {{ font-weight: 600; }}
+  .incident-time {{ color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }}
+  footer {{ color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }}
+  footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
+  footer a:hover {{ color: var(--text); border-color: var(--muted); }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Status broker MQTT</a>
+    <h1>Riwayat Insiden</h1>
+    {"".join(_months_html)}
+    <footer>Menampilkan {LOG_RETENTION_DAYS} hari terakhir · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
+  </div>
+</body>
+</html>
+"""
+
+with open(INCIDENTS_OUT_PATH, "w") as f:
+    f.write(incidents_html)
+print(f"wrote {INCIDENTS_OUT_PATH}")

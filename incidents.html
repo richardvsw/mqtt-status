@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Insiden — MQTT Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
+    --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
+    --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
+    --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
+    --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
+    --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
+  }
+  html { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }
+  h1 { font-size: 1.15rem; font-weight: 650; margin: .8rem 0 .3rem; }
+  .back { color: var(--accent); text-decoration: none; font-size: .85rem; }
+  .back:hover { text-decoration: underline; }
+  .dot { position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.down { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }
+  .dot.autherr { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-dim); }
+  .section-title { font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }
+  .incident-log {
+    background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .incident-day { border-bottom: 1px solid var(--border-soft); }
+  .incident-day:last-child { border-bottom: none; }
+  .incident-day[open] > .incident-summary .incident-chevron { transform: rotate(90deg); }
+  .incident-day-empty {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1.1rem; color: var(--faint);
+  }
+  .incident-day-empty .incident-date { color: var(--faint); font-weight: 600; }
+  .incident-day-empty .incident-count { font-size: .76rem; }
+  .incident-summary {
+    display: flex; align-items: center; gap: .55rem; padding: .9rem 1.1rem;
+    cursor: pointer; list-style: none; user-select: none;
+  }
+  .incident-summary::-webkit-details-marker { display: none; }
+  .incident-summary:hover { background: var(--border-soft); }
+  .incident-chevron { color: var(--faint); font-size: .7rem; transition: transform .12s; flex-shrink: 0; }
+  .incident-date { font-weight: 600; font-size: .82rem; }
+  .incident-count { color: var(--faint); font-size: .76rem; margin-left: auto; }
+  .incident-rows { padding: 0 1.1rem 1rem; }
+  .incident-host-group { border-top: 1px solid var(--border-soft); padding-top: .55rem; margin-top: .55rem; }
+  .incident-host-group:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .incident-host-header { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .1rem; }
+  .incident-host-count { color: var(--faint); font-size: .68rem; margin-left: auto; }
+  .incident-row {
+    display: flex; align-items: baseline; gap: .5rem; font-size: .78rem;
+    padding: .4rem 0 .4rem 1.3rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .incident-row:last-child { border-bottom: none; }
+  .incident-icon { flex-shrink: 0; font-size: .7rem; }
+  .incident-icon.down { color: var(--crit); }
+  .incident-icon.autherr { color: var(--warn); }
+  .incident-host { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); font-weight: 650; font-size: .76rem; flex-shrink: 0; }
+  .incident-label { font-weight: 600; }
+  .incident-time { color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }
+  footer { color: var(--faint); font-size: .78rem; text-align: center; margin-top: 1.5rem; }
+  footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }
+  footer a:hover { color: var(--text); border-color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Status broker MQTT</a>
+    <h1>Riwayat Insiden</h1>
+    
+    <h2 class="section-title">September 2026</h2>
+    <div class="incident-log">
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-09-09</span>
+            <span class="incident-count">6 insiden · 6 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt4.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:30–01:30 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-09-08</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-09-07</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">15:00–15:20 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-09-06</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:51–01:59 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-09-05</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt4.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">03:55–05:51 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-09-04</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-09-03</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-09-02</span>
+            <span class="incident-count">2 insiden · 2 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">14:15–15:15 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:29–20:37 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-09-01</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div></div>
+    <h2 class="section-title">Agustus 2026</h2>
+    <div class="incident-log">
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-31</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-30</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:52–02:00 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-29</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-28</span>
+            <span class="incident-count">3 insiden · 2 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">11:28–11:34 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">2 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">11:28–11:42 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">14:47–14:54 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-27</span>
+            <span class="incident-count">3 insiden · 2 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">2 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">09:18–09:30 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">17:40–17:47 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">17:40–17:47 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-26</span>
+            <span class="incident-count">3 insiden · 3 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:50–14:47 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">18:19–20:21 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">21:33–21:44 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-25</span>
+            <span class="incident-count">2 insiden · 2 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–08:30 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:11–01:29 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-24</span>
+            <span class="incident-count">2 insiden · 2 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–24:00 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">14:05–14:13 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-23</span>
+            <span class="incident-count">17 insiden · 6 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">4 down · 1 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–16:29 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">16:35–16:45 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:45–16:59 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">17:39–17:49 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:49–21:02 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">4 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–01:50 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">17:33–17:55 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">18:11–18:37 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:49–21:02 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt4.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–22:13 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">2 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:23–16:27 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:49–20:56 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">4 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">19:09–19:21 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:31–21:00 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">21:17–21:45 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">22:21–24:00 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">20:49–20:56 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-22</span>
+            <span class="incident-count">27 insiden · 6 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">3 down · 2 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:40–03:30 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">09:27–13:20 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">14:13–15:10 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">15:10–15:51 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">18:53–18:59 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">3 down · 2 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">01:50–02:08 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">09:27–13:20 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">15:23–15:51 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:50–17:40 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">18:59–24:00 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">2 down · 2 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">09:27–13:20 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">15:15–15:23 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">15:23–15:51 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:50–17:40 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">4 down · 3 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">09:27–12:57 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">12:57–13:04 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">13:04–13:20 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">15:15–15:23 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">15:23–15:51 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:50–17:12 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">22:13–24:00 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt4.meshnode.id</span>
+                <span class="incident-host-count">1 down · 1 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">09:27–13:20 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">15:15–24:00 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt5.meshnode.id</span>
+                <span class="incident-host-count">3 down · 1 auth ditolak</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">16:50–17:31 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">18:24–18:28 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon autherr">⚠</span>
+              <span class="incident-label">Autentikasi Ditolak</span>
+              <span class="incident-time">18:28–18:32 WIB</span>
+            </div><div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">21:53–23:50 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-21</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-20</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-19</span>
+            <span class="incident-count">5 insiden · 5 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">07:20–08:10 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">07:20–08:10 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt2.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">07:20–08:10 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt3.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">07:20–08:10 WIB</span>
+            </div>
+            </div>
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt4.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">07:20–08:10 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-18</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-17</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt1.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:20–00:50 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-16</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">00:00–15:20 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <details class="incident-day">
+          <summary class="incident-summary">
+            <span class="incident-chevron">▸</span>
+            <span class="incident-date">2026-08-15</span>
+            <span class="incident-count">1 insiden · 1 broker terdampak</span>
+          </summary>
+          <div class="incident-rows">
+            <div class="incident-host-group">
+              <div class="incident-host-header">
+                <span class="dot down"></span>
+                <span class="incident-host">mqtt.meshnode.id</span>
+                <span class="incident-host-count">1 down</span>
+              </div>
+              <div class="incident-row">
+              <span class="incident-icon down">✕</span>
+              <span class="incident-label">Down</span>
+              <span class="incident-time">19:09–24:00 WIB</span>
+            </div>
+            </div></div>
+        </details>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-14</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-13</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-12</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-11</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-10</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-09</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-08</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-07</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-06</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-05</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-04</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-03</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-02</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-08-01</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div></div>
+    <h2 class="section-title">Juli 2026</h2>
+    <div class="incident-log">
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-31</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-30</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-29</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-28</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-27</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-26</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-25</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-24</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-23</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-22</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-21</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-20</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-19</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-18</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-17</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-16</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-15</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-14</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-13</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-12</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-11</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-10</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-09</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-08</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-07</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-06</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-05</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-04</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-03</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-02</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-07-01</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div></div>
+    <h2 class="section-title">Juni 2026</h2>
+    <div class="incident-log">
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-30</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-29</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-28</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-27</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-26</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-25</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-24</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-23</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-22</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-21</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-20</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-19</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-18</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-17</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-16</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-15</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-14</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-13</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div>
+        <div class="incident-day incident-day-empty">
+          <span class="incident-date">2026-06-12</span>
+          <span class="incident-count">Tidak ada insiden dilaporkan.</span>
+        </div></div>
+    <footer>Menampilkan 90 hari terakhir · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
+  </div>
+</body>
+</html>
