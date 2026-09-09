@@ -1076,19 +1076,10 @@ commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
 
 html = f'''<!doctype html>
 <html lang="id">
-<script>
-(function () {{
-  try {{
-    if (localStorage.getItem("mqtt-status-theme") === "light") {{
-      document.documentElement.setAttribute("data-theme", "light");
-    }}
-  }} catch (e) {{}}
-}})();
-</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>meshnode.id MQTT Status</title>
+<title>MQTT Status</title>
 <meta name="description" content="Status langsung broker MQTT publik meshnode.id">
 <script>
   // 2026-08-22: was a plain <meta http-equiv="refresh" content="60">.
@@ -1112,20 +1103,11 @@ html = f'''<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
+  /* 2026-09-09: locked to a single light palette -- the dark/light
+     toggle and its localStorage persistence are gone (see git history
+     if a dark mode is ever wanted back), per explicit direction to
+     stick to white only. */
   :root {{
-    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
-    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
-    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
-    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
-    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
-    --accent: #066fd1; --accent-bg: #0d2136;
-    --tooltip-bg: #232f42;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
-  }}
-  * {{ box-sizing: border-box; }}
-  html {{ color-scheme: dark; }}
-  html[data-theme="light"] {{ color-scheme: light; }}
-  :root[data-theme="light"] {{
     --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
     --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
     --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
@@ -1135,6 +1117,8 @@ html = f'''<!doctype html>
     --tooltip-bg: #ffffff;
     --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
   }}
+  * {{ box-sizing: border-box; }}
+  html {{ color-scheme: light; }}
   body {{
     margin: 0; min-height: 100vh; color: var(--text);
     background: var(--bg);
@@ -1162,16 +1146,7 @@ html = f'''<!doctype html>
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
   .titlebar {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }}
   .titlebar h1 {{ flex: 1; }}
-  .theme-toggle {{
-    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
-    border-radius: 6px; border: 1px solid var(--border); background: var(--surf); color: var(--muted);
-    cursor: pointer; flex-shrink: 0;
-  }}
-  .theme-toggle:hover {{ color: var(--text); border-color: var(--faint); }}
-  .theme-toggle .icon-moon {{ display: none; }}
-  :root[data-theme="light"] .theme-toggle .icon-sun {{ display: none; }}
-  :root[data-theme="light"] .theme-toggle .icon-moon {{ display: block; }}
-  .titlebar .glyph {{ font-size: 1.25rem; line-height: 1; }}
+  .titlebar .glyph {{ width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }}
   .live-clock {{
     font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted);
     font-family: ui-monospace, "SF Mono", Menlo, monospace; flex-shrink: 0; margin-right: .3rem;
@@ -1414,12 +1389,9 @@ html = f'''<!doctype html>
   {maintenance_banner_html}
   <div class="wrap">
     <div class="titlebar">
-      <span class="glyph">📡</span><h1>meshnode.id MQTT Status</h1>
+      <img class="glyph" src="https://meshnode.id/wp-content/uploads/2026/06/meshnodeid.png" alt="meshnode.id">
+      <h1>MQTT Status</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Ganti tema terang/gelap" title="Ganti tema terang/gelap">
-        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      </button>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
     <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
@@ -1652,20 +1624,6 @@ html = f'''<!doctype html>
     if (window.visualViewport) {{
       window.visualViewport.addEventListener("resize", repositionIfOpen, {{ passive: true }});
     }}
-
-    var themeToggle = document.getElementById("theme-toggle");
-    themeToggle.addEventListener("click", function () {{
-      var root = document.documentElement;
-      var isLight = root.getAttribute("data-theme") === "light";
-      if (isLight) {{
-        root.removeAttribute("data-theme");
-        try {{ localStorage.setItem("mqtt-status-theme", "dark"); }} catch (e) {{}}
-      }} else {{
-        root.setAttribute("data-theme", "light");
-        try {{ localStorage.setItem("mqtt-status-theme", "light"); }} catch (e) {{}}
-      }}
-      closePop();
-    }});
 
     popClose.addEventListener("click", function (e) {{ e.stopPropagation(); closePop(); }});
     document.addEventListener("click", function (e) {{
@@ -1959,34 +1917,17 @@ _broker_options = "".join(f'<option value="{h}">{_UPTIME_LABELS[h]}</option>' fo
 
 uptime_html = f"""<!doctype html>
 <html lang="id">
-<script>
-(function () {{
-  try {{
-    if (localStorage.getItem("mqtt-status-theme") === "light") {{
-      document.documentElement.setAttribute("data-theme", "light");
-    }}
-  }} catch (e) {{}}
-}})();
-</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Riwayat Uptime — meshnode.id MQTT Status</title>
+<title>Riwayat Uptime — MQTT Status</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
+  /* 2026-09-09: locked to a single light palette, see index.html's own
+     comment on this same change. */
   :root {{
-    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
-    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
-    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
-    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
-    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
-    --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
-  }}
-  html {{ color-scheme: dark; }}
-  html[data-theme="light"] {{ color-scheme: light; }}
-  :root[data-theme="light"] {{
     --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
     --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
     --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
@@ -1994,6 +1935,7 @@ uptime_html = f"""<!doctype html>
     --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
     --accent: #066fd1; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
   }}
+  html {{ color-scheme: light; }}
   * {{ box-sizing: border-box; }}
   body {{
     margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
@@ -2263,8 +2205,6 @@ uptime_html = f"""<!doctype html>
       windowStart = Math.max(0, months - WINDOW_SIZE);
       renderWindow();
     }})();
-
-    var themeToggle = null; // no theme toggle button on this page (yet) -- theme still applied via the inline localStorage check in <head>
   </script>
 </body>
 </html>

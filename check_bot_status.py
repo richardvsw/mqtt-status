@@ -591,15 +591,6 @@ def _event_log_html():
 
 html = f'''<!doctype html>
 <html lang="id">
-<script>
-(function () {{
-  try {{
-    if (localStorage.getItem("mqtt-status-theme") === "light") {{
-      document.documentElement.setAttribute("data-theme", "light");
-    }}
-  }} catch (e) {{}}
-}})();
-</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -614,19 +605,9 @@ html = f'''<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
+  /* 2026-09-09: locked to a single light palette, see mqtt-status-repo's
+     check_and_render.py's own comment on this same change. */
   :root {{
-    --bg: #111827; --surf: #1f2937; --surf2: #232f42; --border: #2e3c51; --border-soft: #253247;
-    --text: #e5e7eb; --muted: #94a3b8; --faint: #64748b;
-    --ok: #2fb344; --ok-dim: #1e4326; --ok-bg: #0f2115;
-    --warn: #f76707; --warn-dim: #4a2c0d; --warn-bg: #271a0a;
-    --crit: #d63939; --crit-dim: #4a2020; --crit-bg: #2a1414;
-    --accent: #066fd1;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
-  }}
-  * {{ box-sizing: border-box; }}
-  html {{ color-scheme: dark; }}
-  html[data-theme="light"] {{ color-scheme: light; }}
-  :root[data-theme="light"] {{
     --bg: #f9fafb; --surf: #ffffff; --surf2: #ffffff; --border: #e5e7eb; --border-soft: #eef0f2;
     --text: #1f2937; --muted: #67748c; --faint: #94a3b8;
     --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
@@ -635,6 +616,8 @@ html = f'''<!doctype html>
     --accent: #066fd1;
     --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
   }}
+  * {{ box-sizing: border-box; }}
+  html {{ color-scheme: light; }}
   body {{
     margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
