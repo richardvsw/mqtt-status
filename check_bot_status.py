@@ -743,7 +743,7 @@ html = f'''<!doctype html>
   <div class="wrap">
     <a class="back" href="index.html">← Status broker MQTT</a>
     <div class="titlebar">
-      <img class="glyph" src="assets/riv-meshbot-logo.png" alt="RiV-meshBot">
+      <a href="assets/riv-meshbot-logo-full.png" target="_blank" rel="noopener"><img class="glyph" src="assets/riv-meshbot-logo.png" alt="RiV-meshBot"></a>
       <h1>Bot Status</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
