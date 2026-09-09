@@ -669,6 +669,7 @@ html = f'''<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
+    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
@@ -815,9 +816,9 @@ html = f'''<!doctype html>
         var barRect = bar.getBoundingClientRect();
         var rowRect = row.getBoundingClientRect();
         var barsRect = bar.closest(".bars").getBoundingClientRect();
-        var caretTop = barsRect.bottom - rowRect.top + 10;
-        popCaret.style.top = caretTop + "px";
-        pop.style.top = (caretTop + 14) + "px";
+        var popTop = barsRect.bottom - rowRect.top + 18;
+        pop.style.top = popTop + "px";
+        popCaret.style.top = (popTop - 6) + "px";
         var centerX = barRect.left + barRect.width / 2 - rowRect.left;
         var popWidth = pop.offsetWidth || 300;
         var left = Math.min(Math.max(centerX - popWidth / 2, 8), rowRect.width - popWidth - 8);

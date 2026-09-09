@@ -1310,6 +1310,11 @@ html = f'''<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
+    /* No top border/radius -- the caret (painted in front, see
+       .daypop-caret below) straddles this edge and covers the seam
+       with its own matching background, so a top border here would
+       just cut a visible line straight through the middle of it. */
+    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
@@ -1556,9 +1561,15 @@ html = f'''<!doctype html>
         var barRect = bar.getBoundingClientRect();
         var rowRect = row.getBoundingClientRect();
         var barsRect = bar.closest(".bars").getBoundingClientRect();
-        var caretTop = barsRect.bottom - rowRect.top + 10;
-        popCaret.style.top = caretTop + "px";
-        pop.style.top = (caretTop + 14) + "px";
+        // The caret sits IN FRONT of (z-index above) the card and
+        // straddles its top edge, half tucked behind it -- see
+        // .daypop-caret's own CSS comment. popTop leaves enough room
+        // above for the caret's own tip (which renders ~8.5px above
+        // its 12px box due to the 45deg rotation); caretTop then just
+        // centers that box vertically ON popTop.
+        var popTop = barsRect.bottom - rowRect.top + 18;
+        pop.style.top = popTop + "px";
+        popCaret.style.top = (popTop - 6) + "px";
         var centerX = barRect.left + barRect.width / 2 - rowRect.left;
         var popWidth = pop.offsetWidth || 300;
         var left = Math.min(Math.max(centerX - popWidth / 2, 8), rowRect.width - popWidth - 8);
@@ -1934,6 +1945,11 @@ uptime_html = f"""<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
+    /* No top border/radius -- the caret (painted in front, see
+       .daypop-caret below) straddles this edge and covers the seam
+       with its own matching background, so a top border here would
+       just cut a visible line straight through the middle of it. */
+    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
@@ -2070,9 +2086,12 @@ uptime_html = f"""<!doctype html>
       var cellRect = cell.getBoundingClientRect();
       var monthRect = month.getBoundingClientRect();
       var gridRect = cell.closest(".cal-grid").getBoundingClientRect();
-      var caretTop = gridRect.bottom - monthRect.top + 10;
-      popCaret.style.top = caretTop + "px";
-      pop.style.top = (caretTop + 14) + "px";
+      // See index.html's own click handler for the reasoning -- the
+      // caret straddles pop's top edge rather than sitting in a gap
+      // above it.
+      var popTop = gridRect.bottom - monthRect.top + 18;
+      pop.style.top = popTop + "px";
+      popCaret.style.top = (popTop - 6) + "px";
       var centerX = cellRect.left + cellRect.width / 2 - monthRect.left;
       var popWidth = pop.offsetWidth || 300;
       var left = Math.min(Math.max(centerX - popWidth / 2, 8), monthRect.width - popWidth - 8);
