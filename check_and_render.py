@@ -1455,7 +1455,7 @@ html = f'''<!doctype html>
   {maintenance_banner_html}
   <div class="wrap">
     <div class="titlebar">
-      <img class="glyph" src="https://meshnode.id/wp-content/uploads/2026/06/meshnodeid.png" alt="meshnode.id">
+      <a href="https://meshnode.id/wp-content/uploads/2026/06/meshnodeid.png" target="_blank" rel="noopener"><img class="glyph" src="https://meshnode.id/wp-content/uploads/2026/06/meshnodeid.png" alt="meshnode.id"></a>
       <h1>MQTT Status</h1>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
