@@ -984,20 +984,24 @@ for host in BROKERS:
 # _clip_incidents_to_day so a single multi-day outage still splits at
 # midnight the same way it does in the popovers.
 #
-# 2026-09-09: every day is now listed, including clean ones (explicit
-# "Tidak ada insiden dilaporkan" line) -- matches status.claude.com's
-# own history page exactly, per direct request. A clean day renders as
-# a plain non-expandable line (nothing to expand), so this doesn't
-# actually add the visual weight a full collapsible row per clean day
-# would.
+# 2026-09-09: briefly listed every day here, including clean ones (like
+# status.claude.com's own history page) -- reverted per direct feedback
+# after seeing it live: with 6 brokers over 30 days, most days ARE
+# clean, and a "Tidak ada insiden dilaporkan" line for each one added a
+# lot of low-value length to the MAIN page specifically. Skipping clean
+# days here again; the exhaustive every-day view (matching
+# status.claude.com) now lives ONLY on incidents.html, linked from the
+# bottom of this page, covering the full 3-month retention window
+# instead of just this page's own 30-day one.
 incident_days = []
 for d in reversed(day_labels):
     day_entries = []
     for host in BROKERS:
         for inc in _clip_incidents_to_day(host, d):
             day_entries.append({"host": host, **inc})
-    day_entries.sort(key=lambda e: e["start_clock"])
-    incident_days.append((d, day_entries))
+    if day_entries:
+        day_entries.sort(key=lambda e: e["start_clock"])
+        incident_days.append((d, day_entries))
 
 incident_kind_icon = {"down": "✕", "autherr": "⚠"}
 
@@ -1075,6 +1079,8 @@ def _incident_log_html():
     # keyboard-accessible for free), showing just a count + which brokers
     # were affected. Clicking a day expands the full row list, same as
     # before.
+    if not incident_days:
+        return '<p class="note">Tidak ada insiden tercatat dalam 30 hari terakhir.</p>'
     return "".join(_render_incident_day_block(d, entries) for d, entries in incident_days)
 
 
@@ -1391,6 +1397,7 @@ html = f'''<!doctype html>
 
   .note {{ color: var(--faint); font-size: .76rem; text-align: center; margin-top: 1.6rem; line-height: 1.5; max-width: 34rem; margin-left: auto; margin-right: auto; }}
   .uptime-link {{ text-align: center; margin: -1.2rem 0 1.8rem; font-size: .8rem; }}
+  .uptime-link.full-history-link {{ margin: 1.1rem 0 0; }}
   .uptime-link a {{ color: var(--accent); text-decoration: none; }}
   .uptime-link a:hover {{ text-decoration: underline; }}
 
@@ -1453,13 +1460,14 @@ html = f'''<!doctype html>
       <span class="live-clock" id="live-clock" title="Waktu sekarang (WIB)"></span>
     </div>
     <div class="sub"><b>{up_count}/{total}</b> broker aktif</div>
-    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="incidents.html">Riwayat insiden lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
+    <div class="uptime-link"><a href="uptime.html">Lihat riwayat uptime lengkap →</a> · <a href="bot-status.html">Status bot →</a></div>
     <div class="panel">{"".join(rows)}</div>
     <div class="legend-standalone">
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
     </div>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
+    <div class="uptime-link full-history-link"><a href="incidents.html">Lihat riwayat insiden lengkap (3 bulan) →</a></div>
     <footer>
       <div class="ping-legend">
         <span><i class="lg-lxc"></i>Ping lokal (Cikarang) • <span id="local-ping-summary">memuat...</span></span>
@@ -1567,22 +1575,34 @@ html = f'''<!doctype html>
         var spaceAbove = r.top;
         var vMargin = 8;
         pop.style.transform = "translateY(0)";
+        pop.style.bottom = "";
+        pop.style.top = "";
         if (spaceAbove > 220) {{
           // 2026-08-22: was `top: (r.top-12)px` + translateY(-100%) --
           // fine for a short card, but a day with several incidents
           // could render taller than the space actually available
           // above the bar, pushing the card's TOP (including the date
           // header and close button) above y=0 with no way to reach it
-          // (confirmed live). Setting both top AND bottom instead lets
-          // the browser compute the box's real height as whatever fits
-          // between them -- it can never push past the vMargin safety
-          // line at the top, and overflow-y:auto (see .daypop CSS)
-          // scrolls internally for anything that still doesn't fit.
+          // (confirmed live).
+          //
+          // 2026-09-09: the fix above used to set BOTH top and bottom
+          // to let the browser "compute the real height as whatever
+          // fits between them" -- confirmed live this doesn't work the
+          // way that comment assumed: an absolutely-positioned box with
+          // both offsets set STRETCHES to fill that exact gap
+          // regardless of content, it doesn't shrink-to-fit for short
+          // content. A short "no downtime" card was rendering with a
+          // huge block of empty space below its two lines of text.
+          // Anchoring from a SINGLE edge (top only here) lets the box
+          // size to its actual content, while .daypop's own
+          // max-height:calc(100vh - 2rem) (unrelated to this offset,
+          // already there) still caps a genuinely tall card and
+          // overflow-y:auto still scrolls internally if it's tall
+          // enough to need it -- same overflow-safety, without forcing
+          // short content to stretch.
           pop.style.top = vMargin + "px";
-          pop.style.bottom = (viewH - r.top + 12) + "px";
           pop.classList.add("arrow-down");
         }} else {{
-          pop.style.top = (r.bottom + 12) + "px";
           pop.style.bottom = vMargin + "px";
           pop.classList.add("arrow-up");
         }}
@@ -1592,9 +1612,8 @@ html = f'''<!doctype html>
         // Arrow position is read back from the popover's ACTUAL
         // rendered box (post-layout), not recomputed from the same
         // top/bottom/left values used to place .daypop -- this stays
-        // correct even if content height changes what the browser
-        // settles on between the two top/bottom constraints, and it's
-        // immune to internal scrolling since this element lives
+        // correct regardless of the box's actual content height, and
+        // it's immune to internal scrolling since this element lives
         // outside .daypop entirely (see .daypop-arrow CSS comment).
         var popRect = pop.getBoundingClientRect();
         popArrow.classList.remove("arrow-up", "arrow-down");
@@ -2155,12 +2174,17 @@ uptime_html = f"""<!doctype html>
       var spaceAbove = r.top;
       var vMargin = 8;
       pop.style.transform = "translateY(0)";
+      pop.style.bottom = "";
+      pop.style.top = "";
+      // 2026-09-09: single-edge anchor, see index.html's own version of
+      // this function for the full reasoning -- setting both top AND
+      // bottom stretches the box to fill that exact gap even for short
+      // content, instead of sizing to it. .daypop's own max-height CSS
+      // still caps a genuinely tall card.
       if (spaceAbove > 220) {{
         pop.style.top = vMargin + "px";
-        pop.style.bottom = (viewH - r.top + 12) + "px";
         pop.classList.add("arrow-down");
       }} else {{
-        pop.style.top = (r.bottom + 12) + "px";
         pop.style.bottom = vMargin + "px";
         pop.classList.add("arrow-up");
       }}
