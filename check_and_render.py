@@ -79,6 +79,15 @@ MQTT_PORT = 1883
 # file is re-read fresh on every run.
 with open("brokers.json") as _f:
     BROKERS = json.load(_f)
+# mqtt.meshnode.id is a DNS failover alias for the cluster, not a node
+# of its own (see the down_reason comment below) -- it stays in
+# BROKERS so it's still polled/tracked/history-logged like any other
+# host, but it must not be counted as a 6th independent broker in the
+# "X/N broker aktif" summary or the up/down banner, since that ratio
+# is meant to describe the actual cluster's health. It gets its own
+# separate section on the page instead (2026-09-09, direct feedback).
+ALIAS_HOST = "mqtt.meshnode.id"
+CLUSTER_BROKERS = [h for h in BROKERS if h != ALIAS_HOST]
 
 # 2026-08-22: was a single ever-growing history.json. Stayed genuinely
 # tiny even at full 400-day retention (~150-200KB), so this isn't a
@@ -926,13 +935,16 @@ def day_bar_html(host):
 actions_city = (meta.get("actions_location") or "").split(",")[0]
 
 rows = []
+alias_row = ""
 up_count = 0
 down_hosts = []
 auth_hosts = []
 for host in BROKERS:
     b = brokers[host]
+    is_alias = host == ALIAS_HOST
     if b["reachable"]:
-        up_count += 1
+        if not is_alias:
+            up_count += 1
         status_class = "up"
         # Color-coded instead of repeating "(GitHub Actions)" text on
         # every row -- legend explaining what each color means lives
@@ -951,17 +963,19 @@ for host in BROKERS:
         dur = fmt_duration(now - _start) if _start else "?"
         status_label, status_class = f"Autentikasi Ditolak · {dur}", "autherr"
         actions_ping_html = ""
-        auth_hosts.append(host)
+        if not is_alias:
+            auth_hosts.append(host)
     else:
         _start = _OPEN_INCIDENT_START.get((host, "down"), b["current_outage_start"])
         dur = fmt_duration(now - _start) if _start else "?"
         reason_label = DOWN_REASON_LABEL.get(b["down_reason"], "Down")
         status_label, status_class = f"{reason_label} · {dur}", "down"
         actions_ping_html = ""
-        down_hosts.append(host)
+        if not is_alias:
+            down_hosts.append(host)
     uptime_pct = host_uptime_pct(host)
     uptime_label = f"{uptime_pct:.2f} % uptime" if uptime_pct is not None else "belum ada data"
-    rows.append(f'''
+    row_html = f'''
         <div class="row">
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
@@ -975,7 +989,11 @@ for host in BROKERS:
             <span class="caption-line"></span>
             <span>Hari ini</span>
           </div>
-        </div>''')
+        </div>'''
+    if is_alias:
+        alias_row = row_html
+    else:
+        rows.append(row_html)
 
 # "Past Incidents" -- same spirit as status.claude.com's own past-
 # incidents log: a chronological, per-day list of what actually broke,
@@ -996,7 +1014,7 @@ for host in BROKERS:
 incident_days = []
 for d in reversed(day_labels):
     day_entries = []
-    for host in BROKERS:
+    for host in CLUSTER_BROKERS:
         for inc in _clip_incidents_to_day(host, d):
             day_entries.append({"host": host, **inc})
     if day_entries:
@@ -1084,7 +1102,7 @@ def _incident_log_html():
     return "".join(_render_incident_day_block(d, entries) for d, entries in incident_days)
 
 
-total = len(BROKERS)
+total = len(CLUSTER_BROKERS)
 if up_count == total:
     banner_class, banner_text, banner_icon = "ok", "Semua Broker Beroperasi Normal", "✓"
 elif up_count == 0 and len(auth_hosts) == total:
@@ -1402,6 +1420,7 @@ html = f'''<!doctype html>
   .uptime-link a:hover {{ text-decoration: underline; }}
 
   .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
+  .endpoint-note {{ text-align: left; max-width: none; margin: -.5rem 0 .8rem; }}
   .incident-log {{
     background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); overflow: hidden;
@@ -1465,6 +1484,9 @@ html = f'''<!doctype html>
     <div class="legend-standalone">
       <span class="legend"><span><i class="lg-up"></i>Aktif</span><span><i class="lg-warn"></i>Sebagian</span><span><i class="lg-down"></i>Down</span></span>
     </div>
+    <h2 class="section-title">Endpoint DNS Failover</h2>
+    <p class="note endpoint-note">{ALIAS_HOST} bukan broker tersendiri — ini adalah alias DNS yang mengarah ke salah satu dari {total} node cluster di atas. Dipantau terpisah karena ini alamat yang benar-benar dipakai oleh perangkat di lapangan.</p>
+    <div class="panel">{alias_row}</div>
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
     <div class="uptime-link full-history-link"><a href="incidents.html">Lihat riwayat insiden lengkap (3 bulan) →</a></div>
@@ -2318,7 +2340,7 @@ _full_day_labels = [(datetime.fromtimestamp(now, WIB) - timedelta(days=i)).strft
 _full_incident_days = []
 for d in reversed(_full_day_labels):
     _entries = []
-    for host in BROKERS:
+    for host in CLUSTER_BROKERS:
         for inc in _clip_incidents_to_day(host, d):
             _entries.append({"host": host, **inc})
     if not _entries:
