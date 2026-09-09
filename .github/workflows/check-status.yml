@@ -17,44 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # 2026-09-09: moved to the FIRST step (was after check_and_render.py
-      # had already run) -- the LXC-side timer (deploy/systemd/
-      # run_and_push.sh) is the PRIMARY publisher, running every 2 min;
-      # this workflow is only meant to be a FALLBACK for when the homelab
-      # is offline. On its own ~10-min cadence, most runs land within 5
-      # min of the LXC's last publish, meaning the guard below almost
-      # always said "skip" anyway -- but only AFTER check_and_render.py
-      # had already made a real authenticated MQTT CONNECT to every
-      # broker for data that was then just thrown away. Running the guard
-      # first and skipping check_and_render.py itself (not just its
-      # commit) when the LXC is clearly current avoids that wasted probe
-      # on most runs. check_bot_status.py is NOT gated by this -- see its
-      # own step below for why it must always run regardless.
-      - name: Skip broker fallback check if the LXC already published recently
-        id: guard
-        run: |
-          # 5 min is comfortably more than double the LXC's own 2-min
-          # cadence, so a commit that recent means the LXC is clearly
-          # alive and current.
-          last_author=$(git log -1 --format='%an')
-          last_ts=$(git log -1 --format='%at')
-          now=$(date +%s)
-          age=$((now - last_ts))
-          if [ "$last_author" = "mqtt-status-lxc" ] && [ "$age" -lt 300 ]; then
-            echo "LXC published ${age}s ago -- skipping broker fallback check, it's already current"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.guard.outputs.skip != 'true'
-        run: pip install -q paho-mqtt
+      - run: pip install -q paho-mqtt
       # MQTT_CHECK_USER/PASS: repo Settings -> Secrets and variables ->
       # Actions -- added 2026-08-22 so the checker can do a real
       # authenticated CONNECT instead of a plain TCP check (see
       # check_and_render.py's own comments for why that matters). Never
       # committed in plaintext.
-      - if: steps.guard.outputs.skip != 'true'
-        run: python3 check_and_render.py
+      #
+      # 2026-09-09: this workflow is now the ONLY publisher, for both
+      # broker and bot status -- the LXC-side timer (deploy/systemd/
+      # run_and_push.sh, mqtt-status-lxc.timer) that used to run this
+      # locally every 2 min (for lower latency numbers and a genuine
+      # homelab-offline fallback) has been retired, since the marginal
+      # value (2-min vs this workflow's own ~10-min cadence, plus one
+      # extra per-row latency figure) wasn't worth the added complexity
+      # of two independent publishers and the "did the LXC already
+      # publish" guard that entailed. This means there's no longer a
+      # "skip if already published elsewhere" case to check for -- both
+      # steps below always run.
+      - run: python3 check_and_render.py
         env:
           MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
           MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
@@ -67,47 +48,26 @@ jobs:
       # API (meshbot.rivi.my.id) directly over HTTPS -- reachable from
       # here just like anywhere else on the internet, so this gets a
       # real live check of mesh_bot/meshtasticd, not an inferred one.
-      # Deliberately NOT gated by the guard above -- see the commit
-      # step below for why this workflow is the sole publisher of bot
-      # status regardless of what the LXC is doing for broker status.
       - run: python3 check_bot_status.py
       - name: Commit broker status if changed
-        if: steps.guard.outputs.skip != 'true'
-        # 2026-08-22: GitHub-hosted runners default to UTC, while the
-        # LXC-side publisher's commits naturally carry WIB (its system
-        # clock is WIB) -- comparing the two in git log meant converting
-        # timezones by hand every time. TZ=Asia/Jakarta here makes BOTH
-        # the actual commit author/committer date AND the message text
-        # consistently WIB, matching the LXC side exactly.
+        # 2026-08-22: GitHub-hosted runners default to UTC -- TZ here
+        # makes the commit's own date/message consistently WIB.
         env:
           TZ: Asia/Jakarta
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 2026-08-22: history.json/notice.json were both stale here --
-          # history.json was split into history/YYYY-MM.json a while back
-          # and notice.json was added, but this list was never updated to
-          # match, so a fallback run would have silently failed to commit
-          # either.
-          # 2026-09-04: bot-status.html/bot_history/bot_state.json/
-          # bot_log.jsonl moved to their own unguarded step below -- see
-          # that step's own comment for why they can't share this one's
-          # guard anymore.
           git add index.html history state.json log.jsonl brokers.json notice.json
           if git diff --cached --quiet; then
             echo "no broker changes to publish"
             exit 0
           fi
           git commit -m "Update broker status $(date +%Y-%m-%dT%H:%M:%S%z) WIB"
-          # Retries here now only cover a genuine simultaneous collision
-          # (both sides finishing within the same instant) -- the guard
-          # step above already eliminates the much larger "any overlap
-          # in a 10-min window" case that used to make this fail
-          # regularly. 3 is enough margin for that narrow remaining edge
-          # case without burning CI time on a scenario that's rare by
-          # design now. `-X ours` keeps THIS run's freshly-computed data
-          # on conflict, since it's always more current than whatever the
-          # other side had.
+          # 2026-09-09: retries here now cover the ONLY remaining source
+          # of a push race -- this same workflow's own bot-status commit
+          # step running right after this one in the same job, both
+          # touching the same branch. `-X ours` keeps this step's
+          # freshly-computed data on conflict.
           for i in 1 2 3; do
             if git push; then
               exit 0
@@ -118,16 +78,7 @@ jobs:
           done
           echo "failed to push broker status after 3 attempts"
           exit 1
-      # 2026-09-04: unguarded and separate from the broker commit above --
-      # check_bot_status.py now polls the bot's own public API directly
-      # instead of the LXC pushing these files here itself, so this
-      # workflow (on its own ~10-min external-cron schedule) is the ONLY
-      # thing that ever publishes them to this repo. Gating them behind
-      # "did the LXC just publish broker data" would mean they almost
-      # never actually get committed, since the LXC still pushes broker
-      # data every 2 min and that window is >=5 min most of the time this
-      # workflow runs.
-      - name: Commit bot status if changed (always attempted)
+      - name: Commit bot status if changed
         env:
           TZ: Asia/Jakarta
         run: |

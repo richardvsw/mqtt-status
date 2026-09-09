@@ -5,24 +5,18 @@ CONFIRM_THRESHOLD debounce, REAL_INCIDENTS reconstruction, severity
 gradient, click-to-open day popover) -- same shape, different data
 source and different "hosts".
 
-Runs from TWO places, same script either way, but with very different
-capabilities:
+Runs from GitHub Actions only (.github/workflows/check-status.yml),
+~10 min via external cron. Checks mesh_bot/meshtasticd over HTTP
+against the bot's own public status API (meshbot.rivi.my.id, see
+PUBLIC_STATUS_URL below) rather than local systemd/API access, so it
+needs no special network path to the home LXC -- a failed/timed-out
+request just means "can't confirm the bot is up," reported as down.
 
-- This box's own LXC (deploy/systemd/, via mqtt-status-lxc.timer, every
-  2 min): the ONLY place that can actually check mesh_bot/meshtasticd --
-  they're local systemd services and a local API (rivbot-ui on
-  localhost:8080), neither reachable from outside this box. This is the
-  real, primary data source for those two rows.
-- GitHub Actions (.github/workflows/check-status.yml), ~10 min via
-  external cron: CANNOT check mesh_bot/meshtasticd at all -- no network
-  path to a private service on a home LXC. All it can do is notice that
-  THIS repo hasn't received a fresh LXC-side commit in a while, and
-  track that as its own "lxc-monitor" outage -- answering "how long has
-  our own monitoring been silent", not "is the bot itself up", which
-  are genuinely different questions. If this box goes down, "mesh_bot"/
-  "meshtasticd" rows simply stop gaining new data points (their last
-  known state stays displayed, clearly timestamped) while "LXC Monitor"
-  is the one row that keeps recording throughout the outage.
+2026-09-09: used to also run from this box's own LXC (via
+mqtt-status-lxc.timer, every 2 min) -- dropped once this script's own
+2026-09-04 rewrite (see PUBLIC_STATUS_URL below) made it behave
+identically wherever it runs, leaving no local-only advantage to
+justify running it a second time there.
 """
 import json
 import os
@@ -50,12 +44,6 @@ HISTORY_RETENTION_DAYS = 400
 # the full reasoning.
 LOG_RETENTION_DAYS = 90
 CONFIRM_THRESHOLD = 2
-# How stale the LXC's own last check can get before Actions marks a
-# "lxc-monitor" outage -- comfortably more than 2x the LXC's own 2-min
-# cadence (same reasoning check-status.yml's publish-guard already uses
-# for the exact same kind of margin), so a normal single missed cycle
-# never false-alarms.
-LXC_STALE_SECONDS = 15 * 60
 
 SERVICES = ["mesh_bot", "meshtasticd"]
 SERVICE_LABEL = {

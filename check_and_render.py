@@ -1,20 +1,14 @@
 """
-Standalone MQTT broker status checker + page generator. Runs from TWO
-independent places, same script either way:
+Standalone MQTT broker status checker + page generator. Runs from
+GitHub Actions only (.github/workflows/check-status.yml), on a ~10 min
+schedule.
 
-- GitHub Actions (.github/workflows/check-status.yml), on a ~10 min
-  schedule, no dependency on the LXC/bot at all -- if the LXC goes down,
-  this keeps running and reporting real, live broker status.
-- This box's own LXC (deploy/systemd/, via mqtt-status-lxc.timer), every
-  2 min -- geographically near Indonesia (~5-30ms to these brokers, vs
-  the Actions runner's ~600-750ms from its US/EU datacenter, confirmed
-  2026-08-19), so this is the accurate/primary source whenever it's up.
-
-Neither side needs to know about the other or detect "is the other one
-alive" -- both independently check-and-commit-if-changed, so whichever
-committed most recently is just what the page reflects, and latency from
-each source is tracked and displayed separately (see lxc_latency_ms /
-actions_latency_ms below) rather than one clobbering the other's number.
+2026-09-09: used to also run from this box's own LXC (deploy/systemd/,
+via mqtt-status-lxc.timer) every 2 min, for lower-latency numbers and a
+genuine homelab-offline fallback -- retired once the marginal value
+(faster cadence, one extra per-row latency figure) stopped being worth
+maintaining two independent publishers and the "did the LXC already
+publish" guard that entailed. GitHub Actions is now the sole publisher.
 """
 import json
 import os
@@ -22,10 +16,6 @@ import socket
 import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
-
-# GitHub Actions sets this on every runner automatically -- no config
-# needed on either side to tell the two apart.
-IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 
 # 2026-08-22 incident: a raw TCP connect (the old check_broker) reports a
 # broker "up" even when the account's credentials are being rejected at
@@ -55,13 +45,13 @@ MQTT_CHECK_PASS = os.environ.get("MQTT_CHECK_PASS", "")
 
 
 def get_ci_location():
-    """Best-effort geolocation of the CURRENT run's own egress IP -- only
-    called when IS_CI. GitHub-hosted runners are ephemeral VMs spun up
-    fresh per job and are NOT guaranteed to be in the same datacenter
-    every time, so this is looked up fresh on every run rather than
-    hardcoded, and simply reflects wherever this particular run actually
-    landed. Never raises -- a lookup failure just means the location is
-    omitted from the display, not a broken page."""
+    """Best-effort geolocation of the CURRENT run's own egress IP.
+    GitHub-hosted runners are ephemeral VMs spun up fresh per job and
+    are NOT guaranteed to be in the same datacenter every time, so this
+    is looked up fresh on every run rather than hardcoded, and simply
+    reflects wherever this particular run actually landed. Never raises
+    -- a lookup failure just means the location is omitted from the
+    display, not a broken page."""
     try:
         import urllib.request
         with urllib.request.urlopen("https://ipinfo.io/json", timeout=5) as r:
@@ -71,7 +61,6 @@ def get_ci_location():
     except Exception as e:
         print(f"CI geolocation lookup failed: {e}")
         return None
-LATENCY_STATE_KEY = "actions_latency_ms" if IS_CI else "lxc_latency_ms"
 
 WIB = timezone(timedelta(hours=7))
 MQTT_PORT = 1883
@@ -316,25 +305,14 @@ def _save_history(history):
 
 history = _load_history()
 
-# Where each source's ping is measured from -- LXC location is fixed
-# (this box doesn't move), CI location is looked up fresh every run
-# since GitHub's runners aren't guaranteed to be in the same datacenter
-# each time. Kept under a "_meta" key, distinct from the per-host entries
+# Where the ping is measured from -- looked up fresh every run since
+# GitHub's runners aren't guaranteed to be in the same datacenter each
+# time. Kept under a "_meta" key, distinct from the per-host entries
 # state.json otherwise holds.
 meta = state.setdefault("_meta", {})
-meta["lxc_location"] = "Cikarang, ID"
-if IS_CI:
-    loc = get_ci_location()
-    if loc:
-        meta["actions_location"] = loc
-
-# 2026-08-22: legend used to hardcode "RiV-meshBot" -- only the LXC run
-# can actually query meshtasticd (run_and_push.sh sets BOT_LONG_NAME),
-# so persist whatever it found into _meta and keep using that on every
-# run including GitHub Actions ones, same pattern as lxc_location.
-bot_long_name = os.environ.get("BOT_LONG_NAME", "").strip()
-if bot_long_name:
-    meta["lxc_bot_name"] = bot_long_name
+loc = get_ci_location()
+if loc:
+    meta["actions_location"] = loc
 
 # 2026-09-09: refine each newly-detected outage's START time using
 # CT104's own fast (~25-50s confirm) transition log, pulled fresh every
@@ -457,13 +435,6 @@ for host in BROKERS:
             # state.json from the 2026-08-18 false-positive incident.
             st["current_outage_start"] = None
 
-    # Persist latency under THIS source's own key only -- the other
-    # source's last-known value is left untouched, so the page can show
-    # both side by side (e.g. "5ms local / 650ms CI") instead of one
-    # number that flips wildly depending on which side last committed.
-    if raw_reachable:
-        st[LATENCY_STATE_KEY] = latency_ms
-
     # Only shown as Down/Auth Error once confirmed -- a single run's raw
     # failure still shows Operational publicly, exactly so an unconfirmed
     # blip never produces a false reading.
@@ -474,8 +445,6 @@ for host in BROKERS:
         "raw_reachable": raw_reachable,
         "auth_error": confirmed_auth,
         "latency_ms": latency_ms,
-        "lxc_latency_ms": st.get("lxc_latency_ms"),
-        "actions_latency_ms": st.get("actions_latency_ms"),
         "current_outage_start": st["current_outage_start"],
         "current_auth_start": st["current_auth_start"],
         "down_reason": st.get("down_reason") if confirmed_down else None,
