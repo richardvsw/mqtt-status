@@ -669,7 +669,6 @@ html = f'''<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}

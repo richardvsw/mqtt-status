@@ -1310,11 +1310,6 @@ html = f'''<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    /* No top border/radius -- the caret (painted in front, see
-       .daypop-caret below) straddles this edge and covers the seam
-       with its own matching background, so a top border here would
-       just cut a visible line straight through the middle of it. */
-    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
@@ -1322,7 +1317,13 @@ html = f'''<!doctype html>
   /* Pulled out of .daypop itself (rather than a ::before pseudo-
      element) for the same reason as the old floating version: overflow-
      y:auto on .daypop would clip a pseudo-element positioned outside
-     its own box the moment the card is tall enough to scroll. */
+     its own box the moment the card is tall enough to scroll.
+     Painted IN FRONT of .daypop (z-index above) and straddling its
+     top border -- JS centers this box vertically ON that border line,
+     so the diamond's own matching background covers just the small
+     stretch of border directly beneath it, letting the border show
+     normally everywhere else along the top edge instead of vanishing
+     across its full width. */
   .daypop-caret {{
     display: none; position: absolute; z-index: 6; width: 12px; height: 12px;
     background: var(--surf2); border-left: 1px solid var(--border);
@@ -1945,11 +1946,6 @@ uptime_html = f"""<!doctype html>
     display: none; position: absolute; z-index: 5;
     width: min(320px, calc(100% - 1rem));
     background: var(--surf2); border: 1px solid var(--border); border-radius: 6px;
-    /* No top border/radius -- the caret (painted in front, see
-       .daypop-caret below) straddles this edge and covers the seam
-       with its own matching background, so a top border here would
-       just cut a visible line straight through the middle of it. */
-    border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;
     box-shadow: var(--shadow); padding: 0;
     max-height: 360px; overflow-y: auto;
   }}
