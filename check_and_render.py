@@ -2321,6 +2321,8 @@ for d in reversed(_full_day_labels):
     for host in BROKERS:
         for inc in _clip_incidents_to_day(host, d):
             _entries.append({"host": host, **inc})
+    if not _entries:
+        continue
     _entries.sort(key=lambda e: e["start_clock"])
     _full_incident_days.append((d, _entries))
 
@@ -2380,6 +2382,7 @@ incidents_html = f"""<!doctype html>
   h1 {{ font-size: 1.15rem; font-weight: 650; margin: .8rem 0 .3rem; }}
   .back {{ color: var(--accent); text-decoration: none; font-size: .85rem; }}
   .back:hover {{ text-decoration: underline; }}
+  .note {{ color: var(--faint); font-size: .82rem; margin-top: 1.5rem; }}
   .dot {{ position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }}
   .dot.down {{ background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }}
   .dot.autherr {{ background: var(--warn); box-shadow: 0 0 0 3px var(--warn-dim); }}
@@ -2432,7 +2435,7 @@ incidents_html = f"""<!doctype html>
   <div class="wrap">
     <a class="back" href="index.html">← Status broker MQTT</a>
     <h1>Riwayat Insiden</h1>
-    {"".join(_months_html)}
+    {"".join(_months_html) if _months_html else '<p class="note">Tidak ada insiden tercatat dalam 90 hari terakhir.</p>'}
     <footer>Menampilkan {LOG_RETENTION_DAYS} hari terakhir · <a href="https://github.com/richardvsw/mqtt-status">Sumber di GitHub</a></footer>
   </div>
 </body>
