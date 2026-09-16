@@ -506,6 +506,16 @@ else:
 _upd_dt, _upd_abbr, _ = _id_strftime_dmy(now, WIB)
 updated_str = _upd_dt.strftime(f"%d {_upd_abbr} %Y, %H:%M:%S WIB")
 
+# notice.json mirrors check_and_render.py's own convention (same file,
+# shared between the MQTT-broker page and this bot page) -- edit the
+# JSON, no code change needed, re-read fresh every run. Missing file or
+# a blank/absent "text" both mean no banner.
+notice_text = load_json("notice.json", {}).get("text", "").strip()
+maintenance_banner_html = (
+    f'<div class="banner info"><span class="banner-icon">ℹ</span>{notice_text}</div>'
+    if notice_text else ""
+)
+
 def _load_bot_events():
     """Every entry ntfy.notify() has ever logged (restarts, broker
     switches, NodeDB resets, etc.) -- real human-written context from
@@ -626,6 +636,8 @@ html = f'''<!doctype html>
   .banner.warn .banner-icon {{ background: var(--warn); color: #241c0d; }}
   .banner.crit {{ background: var(--crit-bg); color: var(--crit); }}
   .banner.crit .banner-icon {{ background: var(--crit); color: #250f0d; }}
+  .banner.info {{ background: #e8f2fd; color: var(--accent); }}
+  .banner.info .banner-icon {{ background: var(--accent); color: #eef6ff; }}
 
   .wrap {{ max-width: 680px; margin: 0 auto; padding: 2.4rem 1.25rem 2rem; }}
   .titlebar {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }}
@@ -728,6 +740,7 @@ html = f'''<!doctype html>
 </style>
 </head>
 <body>
+  {maintenance_banner_html}
   <div class="banner {banner_class}"><span class="banner-icon">{banner_icon}</span>{banner_text}</div>
   <div class="wrap">
     <a class="back" href="index.html">← Status broker MQTT</a>
