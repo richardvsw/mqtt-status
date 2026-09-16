@@ -506,11 +506,14 @@ else:
 _upd_dt, _upd_abbr, _ = _id_strftime_dmy(now, WIB)
 updated_str = _upd_dt.strftime(f"%d {_upd_abbr} %Y, %H:%M:%S WIB")
 
-# notice.json mirrors check_and_render.py's own convention (same file,
-# shared between the MQTT-broker page and this bot page) -- edit the
-# JSON, no code change needed, re-read fresh every run. Missing file or
-# a blank/absent "text" both mean no banner.
-notice_text = load_json("notice.json", {}).get("text", "").strip()
+# bot-notice.json is this page's OWN notice, separate from
+# check_and_render.py's notice.json (the MQTT-broker page) -- they used
+# to share one file, which meant a bot-only notice (e.g. "bot is
+# offline") incorrectly also showed on the unrelated broker-status page.
+# Same convention otherwise: edit the JSON, no code change needed,
+# re-read fresh every run. Missing file or a blank/absent "text" both
+# mean no banner.
+notice_text = load_json("bot-notice.json", {}).get("text", "").strip()
 maintenance_banner_html = (
     f'<div class="banner info"><span class="banner-icon">ℹ</span>{notice_text}</div>'
     if notice_text else ""
