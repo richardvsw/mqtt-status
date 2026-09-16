@@ -741,6 +741,8 @@ html = f'''<!doctype html>
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
 </style>
+<script data-goatcounter="https://richardvsw.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
   {maintenance_banner_html}

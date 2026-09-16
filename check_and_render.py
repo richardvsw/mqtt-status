@@ -1426,6 +1426,8 @@ html = f'''<!doctype html>
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
 </style>
+<script data-goatcounter="https://richardvsw.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
   <div class="banner {banner_class}"><span class="banner-icon">{banner_icon}</span>{banner_text}</div>
@@ -1988,6 +1990,8 @@ uptime_html = f"""<!doctype html>
   .daypop-row-dur {{ font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; flex-shrink: 0; }}
   .daypop-pct {{ color: var(--faint); font-size: .74rem; margin-top: .5rem; }}
 </style>
+<script data-goatcounter="https://richardvsw.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -2284,6 +2288,8 @@ incidents_html = f"""<!doctype html>
   footer a {{ color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--border); }}
   footer a:hover {{ color: var(--text); border-color: var(--muted); }}
 </style>
+<script data-goatcounter="https://richardvsw.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
   <div class="wrap">
