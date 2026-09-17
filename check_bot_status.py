@@ -45,6 +45,29 @@ HISTORY_RETENTION_DAYS = 400
 LOG_RETENTION_DAYS = 90
 CONFIRM_THRESHOLD = 2
 
+# 2026-09-17: push a real-time ntfy.sh alert on a CONFIRMED bot/meshtasticd
+# up/down transition -- same debounced-transition-only approach as
+# check_and_render.py's own broker alerts, deliberately a SEPARATE topic
+# (NTFY_TOPIC_BOT) from that script's NTFY_TOPIC_BROKER, per user request
+# to keep mqtt-status and bot-status alerts apart. This one reuses
+# rivbot-ui's existing watchdog topic value (same category of alert --
+# "is the bot healthy" -- as the watchdog's own restart notifications).
+def _ntfy_notify(title, message, priority="default"):
+    topic = os.environ.get("NTFY_TOPIC_BOT")
+    if not topic:
+        return
+    try:
+        import urllib.request as _ureq
+        req = _ureq.Request(
+            f"https://ntfy.sh/{topic}",
+            data=message.encode("utf-8"),
+            headers={"Title": title, "Priority": priority, "Tags": "robot"},
+            method="POST",
+        )
+        _ureq.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"ntfy push failed: {e}")
+
 SERVICES = ["mesh_bot", "meshtasticd"]
 SERVICE_LABEL = {
     "mesh_bot": "mesh_bot.service",
@@ -188,6 +211,7 @@ for svc, status in checks.items():
     st = state.setdefault(svc, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
     st.setdefault("consecutive_fails", 0)
     st.setdefault("provisional_start", None)
+    _was_confirmed_down = st["current_outage_start"] is not None
     if status == "up":
         st["consecutive_fails"] = 0
         st["provisional_start"] = None
@@ -208,6 +232,12 @@ for svc, status in checks.items():
             st["current_outage_start"] = st["provisional_start"]
         else:
             st["current_outage_start"] = None
+
+    _confirmed_down = st["current_outage_start"] is not None
+    if _confirmed_down and not _was_confirmed_down:
+        _ntfy_notify(f"{svc} DOWN", f"Confirmed down. https://meshbot.rivi.my.id/bot-status.html", priority="high")
+    elif _was_confirmed_down and not _confirmed_down:
+        _ntfy_notify(f"{svc} recovered", "Back up.", priority="default")
 
 save_json(STATE_PATH, state)
 

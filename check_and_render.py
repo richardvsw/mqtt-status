@@ -285,7 +285,12 @@ CONFIRM_THRESHOLD = 2
 # rivbot-ui's watchdog alerts already use, so there's one place to
 # check instead of two. No-ops silently if the env var isn't set.
 def _ntfy_notify(title, message, priority="default"):
-    topic = os.environ.get("NTFY_TOPIC")
+    # 2026-09-17: own dedicated topic, deliberately separate from
+    # rivbot-ui's watchdog topic and from check_bot_status.py's own
+    # NTFY_TOPIC_BOT -- user asked for mqtt-status and bot-status
+    # alerts to land in different places rather than all sharing one
+    # feed.
+    topic = os.environ.get("NTFY_TOPIC_BROKER")
     if not topic:
         return
     try:

@@ -39,11 +39,12 @@ jobs:
         env:
           MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
           MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
-          # NTFY_TOPIC: repo Settings -> Secrets and variables -> Actions.
-          # Same topic rivbot-ui's watchdog alerts already push to (see
-          # /opt/rivbot-ui/data/secrets.json on the LXC for the value) --
-          # reused deliberately so there's one place to check, not two.
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # NTFY_TOPIC_BROKER: repo Settings -> Secrets and variables ->
+          # Actions. Own dedicated topic for broker up/down/auth-error
+          # alerts, deliberately SEPARATE from NTFY_TOPIC_BOT below --
+          # user asked to keep mqtt-status and bot-status alerts apart
+          # rather than one shared feed.
+          NTFY_TOPIC_BROKER: ${{ secrets.NTFY_TOPIC_BROKER }}
       # 2026-09-09: dropped the update_dns.py / mqtt.rivi.my.id
       # Cloudflare DNS failover step that used to run here -- retired
       # once meshnode.id's own mqtt.meshnode.id alias (fronted by its
@@ -54,6 +55,14 @@ jobs:
       # here just like anywhere else on the internet, so this gets a
       # real live check of mesh_bot/meshtasticd, not an inferred one.
       - run: python3 check_bot_status.py
+        env:
+          # NTFY_TOPIC_BOT: repo Settings -> Secrets and variables ->
+          # Actions. Reuses rivbot-ui's existing watchdog topic value
+          # (see /opt/rivbot-ui/data/secrets.json on the LXC) -- same
+          # category of alert ("is the bot healthy") as the watchdog's
+          # own restart notifications, so it joins that feed rather than
+          # getting its own new topic.
+          NTFY_TOPIC_BOT: ${{ secrets.NTFY_TOPIC_BOT }}
       - name: Commit broker status if changed
         # 2026-08-22: GitHub-hosted runners default to UTC -- TZ here
         # makes the commit's own date/message consistently WIB.
