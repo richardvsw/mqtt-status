@@ -10713,3 +10713,4 @@
 {"ts": 1789621234.2832365, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
 {"ts": 1789621822.2341955, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
 {"ts": 1789622422.78275, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
+{"ts": 1789623029.5360212, "checks": {"mesh_bot": "down", "meshtasticd": "up", "bot": "down"}}
