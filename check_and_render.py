@@ -271,6 +271,35 @@ def fmt_duration(seconds):
 # box's own live connection to the same brokers never dropped.
 CONFIRM_THRESHOLD = 2
 
+# 2026-09-17: push a real-time ntfy.sh alert on a CONFIRMED (not raw)
+# up/down/auth-error transition -- same "only real outages, not routine
+# noise" philosophy rivbot-ui's own ntfy.py already documents for
+# watchdog alerts, applied here to the public broker page's own
+# confirmed state instead of duplicating that module (this script runs
+# from GitHub Actions only as of 2026-09-09's dual-publisher retirement,
+# with no access to /opt/rivbot-ui at all, so it can't import that
+# module -- a plain HTTP POST to ntfy.sh needs no SDK/dependency either
+# way). NTFY_TOPIC is read from the environment (a GitHub Actions repo
+# secret, see .github/workflows/check-status.yml) rather than
+# hardcoded, since this repo is public -- reuses the SAME topic
+# rivbot-ui's watchdog alerts already use, so there's one place to
+# check instead of two. No-ops silently if the env var isn't set.
+def _ntfy_notify(title, message, priority="default"):
+    topic = os.environ.get("NTFY_TOPIC")
+    if not topic:
+        return
+    try:
+        import urllib.request as _ureq
+        req = _ureq.Request(
+            f"https://ntfy.sh/{topic}",
+            data=message.encode("utf-8"),
+            headers={"Title": title, "Priority": priority, "Tags": "satellite"},
+            method="POST",
+        )
+        _ureq.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"ntfy push failed: {e}")
+
 now = time.time()
 state = load_json(STATE_PATH, {})
 def _load_history():
@@ -365,6 +394,8 @@ for host in BROKERS:
     st.setdefault("consecutive_fails", 0)
     st.setdefault("provisional_start", None)
     st.setdefault("down_reason", None)
+    _was_confirmed_down = st["current_outage_start"] is not None
+    _was_confirmed_auth = st.get("current_auth_start") is not None
     # Auth-error tracking mirrors the down-tracking fields above exactly,
     # just under its own keys, so the two failure modes get independent
     # confirm-threshold debouncing and independent displayed durations
@@ -440,6 +471,15 @@ for host in BROKERS:
     # blip never produces a false reading.
     confirmed_down = st["current_outage_start"] is not None
     confirmed_auth = st["current_auth_start"] is not None
+
+    if confirmed_down and not _was_confirmed_down:
+        reason_txt = st.get("down_reason") or "unknown"
+        _ntfy_notify(f"MQTT broker DOWN: {host}", f"Confirmed down ({reason_txt}). https://meshbot.rivi.my.id/", priority="high")
+    elif confirmed_auth and not _was_confirmed_auth:
+        _ntfy_notify(f"MQTT broker auth error: {host}", "Confirmed auth rejection. https://meshbot.rivi.my.id/", priority="high")
+    elif (_was_confirmed_down and not confirmed_down) or (_was_confirmed_auth and not confirmed_auth):
+        _ntfy_notify(f"MQTT broker recovered: {host}", "Back to Operational.", priority="default")
+
     brokers[host] = {
         "reachable": not confirmed_down and not confirmed_auth,
         "raw_reachable": raw_reachable,

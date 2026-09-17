@@ -39,6 +39,11 @@ jobs:
         env:
           MQTT_CHECK_USER: ${{ secrets.MQTT_CHECK_USER }}
           MQTT_CHECK_PASS: ${{ secrets.MQTT_CHECK_PASS }}
+          # NTFY_TOPIC: repo Settings -> Secrets and variables -> Actions.
+          # Same topic rivbot-ui's watchdog alerts already push to (see
+          # /opt/rivbot-ui/data/secrets.json on the LXC for the value) --
+          # reused deliberately so there's one place to check, not two.
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
       # 2026-09-09: dropped the update_dns.py / mqtt.rivi.my.id
       # Cloudflare DNS failover step that used to run here -- retired
       # once meshnode.id's own mqtt.meshnode.id alias (fronted by its
