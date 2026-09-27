@@ -66,45 +66,49 @@ WIB = timezone(timedelta(hours=7))
 MQTT_PORT = 1883
 
 # 2026-09-27: /api/public/broker-status (see public_site.py) already
-# exposes CT104's own live, ~25s-cadence broker checks from a home
-# residential network -- a different network path than wherever this
-# script happens to run (GitHub-hosted runners, a cloud/datacenter ASN).
-# Confirmed live: mqtt1 failed 76 consecutive runs here (~12.7h) while a
-# plain residential connection reached it instantly the whole time --
-# that pattern (one specific host, unreachable only from a cloud IP)
-# fits a WAF/firewall blocking known cloud ASNs, not a real outage, but
-# this script has no way to tell that apart from a genuine outage on
-# its own. That endpoint was previously only used for an informational
-# "do the two views roughly agree" log line (see the comparison further
-# below) and deliberately never fed back into `brokers`/`state` -- this
-# is a second, narrower use of the same already-public data: softening
-# an unconfirmed "Down" into "Uncertain", never overriding it to "Up"
-# and never asserting a genuine outage away. A stale/missing/unreachable
-# read here changes nothing -- falls straight through to the exact
-# behavior this had before this check existed.
-_PROBE_TIMEOUT_SECONDS = 8
-_PROBE_MAX_AGE_SECONDS = 300  # matches the existing live-compare freshness cutoff below
+# exposes CT104's own live, ~25s-cadence, already-debounced broker
+# checks from a home residential network -- a different network path
+# than wherever this script happens to run (GitHub-hosted runners, a
+# cloud/datacenter ASN). Confirmed live: mqtt1 failed 76 consecutive
+# runs here (~12.7h) while a plain residential connection reached it
+# instantly the whole time -- that pattern (one specific host,
+# unreachable only from a cloud IP) fits a WAF/firewall blocking known
+# cloud ASNs, not a real outage.
+#
+# When this data is fresh, it's used as the AUTHORITATIVE result for
+# this run instead of this script's own check_broker() -- not just a
+# corroboration hint -- since it's already real-time confirmed
+# (2-consecutive-fail debounced at its own ~25s cadence) and immune to
+# whatever's blocking GitHub Actions' own network path specifically.
+# Stacking this script's OWN multi-run debounce on top would just add
+# needless lag on top of an already-confirmed result.
+#
+# Falls back to this script's own check_broker() + CONFIRM_THRESHOLD
+# debounce (exactly this script's original, pre-2026-09-27 behavior)
+# whenever this data is missing, stale, or doesn't track a given host --
+# so a home-network/endpoint outage never blocks this page from working
+# off GitHub Actions alone, same as before this existed.
+_HOME_STATUS_URL = "https://meshbot.rivi.my.id/api/public/broker-status"
+_HOME_STATUS_TIMEOUT_SECONDS = 8
+_HOME_STATUS_MAX_AGE_SECONDS = 300  # matches the existing live-compare freshness cutoff below
 
 
-def home_network_corroborates_up(host):
-    """True/False/None -- None means no corroboration available (stale
-    data, unreachable, or it doesn't track this host), which callers
-    must treat as "can't tell", not as "down"."""
+def fetch_home_broker_status():
+    """{host: {"status":.., "reason":.., "latency_ms":..}} for whatever
+    CT104's own checker currently tracks, or {} if that data is
+    missing/stale/unreachable -- callers must treat an empty/missing
+    entry as "no home data for this host", not as "down"."""
     try:
-        req = urllib.request.Request("https://meshbot.rivi.my.id/api/public/broker-status",
-                                      headers={"User-Agent": "mqtt-status-checker"})
-        with urllib.request.urlopen(req, timeout=_PROBE_TIMEOUT_SECONDS) as r:
+        req = urllib.request.Request(_HOME_STATUS_URL, headers={"User-Agent": "mqtt-status-checker"})
+        with urllib.request.urlopen(req, timeout=_HOME_STATUS_TIMEOUT_SECONDS) as r:
             data = json.load(r)
         checked_at = data.get("checked_at")
-        if not checked_at or (time.time() - checked_at) > _PROBE_MAX_AGE_SECONDS:
-            return None
-        entry = (data.get("brokers") or {}).get(host)
-        if not entry:
-            return None
-        return entry.get("status") == "up"
+        if not checked_at or (time.time() - checked_at) > _HOME_STATUS_MAX_AGE_SECONDS:
+            return {}
+        return data.get("brokers") or {}
     except Exception as e:
-        print(f"Home-network corroboration fetch failed for {host}: {e}")
-        return None
+        print(f"Home broker-status fetch failed: {e}")
+        return {}
 # Edit brokers.json to add/remove brokers -- no code change needed, this
 # file is re-read fresh on every run.
 with open("brokers.json") as _f:
@@ -433,14 +437,27 @@ except Exception as e:
     print(f"emqx-health: fetch failed, skipping node-desync enrichment: {e}")
 
 brokers = {}
+_home_status = fetch_home_broker_status()
 for host in BROKERS:
-    raw_status, latency_ms, raw_reason = check_broker(host)  # "up" / "auth_error" / "down"
+    _home_entry = _home_status.get(host)
+    home_driven = _home_entry is not None
+    if home_driven:
+        # Already a confirmed result from CT104's own ~25s-cadence,
+        # 2-consecutive-fail-debounced checker -- used directly instead
+        # of this script's own check_broker(), and confirmed immediately
+        # below (see the consecutive_fails/consecutive_auth_fails
+        # override) rather than stacking another multi-run wait on top
+        # of an already-debounced result.
+        raw_status = _home_entry.get("status")
+        raw_reason = _home_entry.get("reason")
+        latency_ms = _home_entry.get("latency_ms")
+    else:
+        raw_status, latency_ms, raw_reason = check_broker(host)  # "up" / "auth_error" / "down"
     raw_reachable = raw_status == "up"
     st = state.setdefault(host, {"current_outage_start": None, "consecutive_fails": 0, "provisional_start": None})
     st.setdefault("consecutive_fails", 0)
     st.setdefault("provisional_start", None)
     st.setdefault("down_reason", None)
-    st.setdefault("uncertain", False)
     st.setdefault("corroboration_unavailable", False)
     _was_confirmed_down = st["current_outage_start"] is not None
     _was_confirmed_auth = st.get("current_auth_start") is not None
@@ -460,16 +477,16 @@ for host in BROKERS:
         st["provisional_auth_start"] = None
         st["current_auth_start"] = None
         st["down_reason"] = None
-        st["uncertain"] = False
         st["corroboration_unavailable"] = False
     elif raw_status == "auth_error":
         # Not a network outage -- don't touch the down-tracking fields.
         st["consecutive_fails"] = 0
         st["provisional_start"] = None
         st["current_outage_start"] = None
-        st["uncertain"] = False
         st["corroboration_unavailable"] = False
         st["consecutive_auth_fails"] += 1
+        if home_driven:
+            st["consecutive_auth_fails"] = CONFIRM_THRESHOLD
         if st["provisional_auth_start"] is None:
             st["provisional_auth_start"] = now
         if st["consecutive_auth_fails"] >= CONFIRM_THRESHOLD:
@@ -495,6 +512,8 @@ for host in BROKERS:
             st["down_reason"] = "node_desync"
         else:
             st["down_reason"] = raw_reason
+        if home_driven:
+            st["consecutive_fails"] = CONFIRM_THRESHOLD
         if st["provisional_start"] is None:
             # Prefer the LXC's own precise down-transition time for THIS
             # host if one exists within the window -- falls back to
@@ -504,36 +523,18 @@ for host in BROKERS:
             # sub-minute flicker may never appear in its log at all).
             st["provisional_start"] = _lxc_broker_down_ts.get(host, now)
         if st["consecutive_fails"] >= CONFIRM_THRESHOLD:
-            # Before confirming a publicly-displayed outage, check
-            # whether a network path we control can reach this host
-            # right now (see home_network_corroborates_up()'s own
-            # docstring). Three outcomes:
-            #   True  -> this run's failure pattern (one specific host,
-            #            unreachable only from here) looks like a
-            #            network-path block against wherever THIS
-            #            script runs from, not a real broker outage --
-            #            shown as "Uncertain" instead of a confident
-            #            "Down".
-            #   False -> both views agree it's down -- confirmed Down,
-            #            no caveat, exactly as before this existed.
-            #   None  -> couldn't reach the corroboration source itself
-            #            (its own network/site down, stale data, etc.)
-            #            -- still confirmed Down (can't unconfirm an
-            #            outage just because we lost a second opinion),
-            #            but the render gets an honest caveat that this
-            #            is a single-source result right now instead of
-            #            silently looking identical to a fully-verified
-            #            one.
-            _corroboration = home_network_corroborates_up(host)
-            st["uncertain"] = _corroboration is True
-            st["corroboration_unavailable"] = _corroboration is None
-            if st["uncertain"]:
-                st["current_outage_start"] = None
-            else:
-                # Promote to a confirmed, publicly-displayed outage -- keep the
-                # TRUE first-failure time, not the moment it got confirmed, so
-                # the displayed duration reflects the real total downtime.
-                st["current_outage_start"] = st["provisional_start"]
+            # Promote to a confirmed, publicly-displayed outage -- keep the
+            # TRUE first-failure time, not the moment it got confirmed, so
+            # the displayed duration reflects the real total downtime.
+            st["current_outage_start"] = st["provisional_start"]
+                # Flags whether this confirmation came from CT104's own home
+            # network (home_driven -- the accurate, WAF-immune result)
+            # or this script's own check_broker() because home data was
+            # unavailable this run -- the render adds an honest caveat
+            # in the latter case (see the rendering side for the exact
+            # text) instead of looking identical to a home-confirmed
+            # outage.
+            st["corroboration_unavailable"] = not home_driven
         else:
             # Not yet confirmed -- current_outage_start MUST stay null here,
             # not just "untouched", or a stale value from before this
@@ -543,7 +544,6 @@ for host in BROKERS:
             # also what self-heals the real repo's already-corrupted
             # state.json from the 2026-08-18 false-positive incident.
             st["current_outage_start"] = None
-            st["uncertain"] = False
             st["corroboration_unavailable"] = False
 
     # Only shown as Down/Auth Error once confirmed -- a single run's raw
@@ -568,7 +568,6 @@ for host in BROKERS:
         "current_outage_start": st["current_outage_start"],
         "current_auth_start": st["current_auth_start"],
         "down_reason": st.get("down_reason") if confirmed_down else None,
-        "uncertain": st.get("uncertain", False),
         "corroboration_unavailable": st.get("corroboration_unavailable", False),
     }
 
@@ -1033,21 +1032,8 @@ auth_hosts = []
 for host in BROKERS:
     b = brokers[host]
     is_alias = host == ALIAS_HOST
-    uncertain_title = ""
-    if b.get("uncertain"):
-        # Reachable from our own home network right now, but NOT confirmed
-        # from GitHub Actions -- deliberately not counted in up_count
-        # (honest "cannot confirm", not a silent "up") and rendered
-        # with its own color, distinct from both Aktif and Down. See
-        # home_network_corroborates_up()'s docstring above for why.
-        status_label = "Tidak Pasti"
-        status_class = "uncertain"
-        actions_ping_html = ''
-        uncertain_title = ("title='Kemungkinan diblokir WAF, bukan gangguan nyata. "
-                            "Tidak terjangkau dari cek otomatis GitHub Actions, tapi "
-                            "berhasil dari jaringan rumah kami -- statusnya belum bisa "
-                            "dipastikan 100%.'")
-    elif b["reachable"]:
+    down_caveat_title = ""
+    if b["reachable"]:
         if not is_alias:
             up_count += 1
         status_class = "up"
@@ -1084,7 +1070,7 @@ for host in BROKERS:
             # honestly a single-source result right now, not the usual
             # two-source-agree confirmation, so say so instead of
             # rendering identically to a fully-corroborated outage.
-            uncertain_title = ("title='Cek jaringan rumah tidak tersedia saat ini -- status "
+            down_caveat_title = ("title='Cek jaringan rumah tidak tersedia saat ini -- status "
                                 "ini hanya berdasarkan GitHub Actions. Kemungkinan diblokir "
                                 "WAF juga belum bisa disingkirkan.'")
         if not is_alias:
@@ -1095,7 +1081,7 @@ for host in BROKERS:
         <div class="row">
           <div class="row-top">
             <div class="row-left"><span class="dot {status_class}"></span><span class="host">{host}</span></div>
-            <div class="status {status_class}" {uncertain_title}>{status_label}<span class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></span>{actions_ping_html}</div>
+            <div class="status {status_class}" {down_caveat_title}>{status_label}<span class="live-status" data-live-host="{host}" data-confirmed="{status_class}"></span>{actions_ping_html}</div>
           </div>
           <div class="bars">{day_bar_html(host)}</div>
           <div class="bars-caption row-caption">
@@ -1292,7 +1278,6 @@ html = f'''<!doctype html>
     --ok: #2fb344; --ok-dim: #bfe8c8; --ok-bg: #eafbee;
     --warn: #f76707; --warn-dim: #ffd8ad; --warn-bg: #fff2e6;
     --crit: #d63939; --crit-dim: #f5b8b8; --crit-bg: #fdecec;
-    --info: #4c6ef5; --info-dim: #c2d1fc; --info-bg: #eef2ff;
     --accent: #066fd1; --accent-bg: #e8f2fd;
     --tooltip-bg: #ffffff;
     --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.12);
@@ -1360,7 +1345,6 @@ html = f'''<!doctype html>
   }}
   .dot.down {{ background: var(--crit); box-shadow: 0 0 0 3px var(--crit-dim); }}
   .dot.autherr {{ background: var(--warn); box-shadow: 0 0 0 3px var(--warn-dim); }}
-  .dot.uncertain {{ background: var(--info); box-shadow: 0 0 0 3px var(--info-dim); }}
   @keyframes pulse {{
     0% {{ transform: scale(.6); opacity: .8; }}
     100% {{ transform: scale(2.1); opacity: 0; }}
@@ -1402,7 +1386,6 @@ html = f'''<!doctype html>
   .status.up {{ color: var(--ok); }}
   .status.down {{ color: var(--crit); }}
   .status.autherr {{ color: var(--warn); }}
-  .status.uncertain {{ color: var(--info); }}
   /* Ping values color-coded by source -- GitHub Actions' own confirmed
      check (accent) vs the real-time local check (ok/green) -- see
      .ping-legend in the footer for what each color means. */
