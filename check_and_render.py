@@ -406,15 +406,32 @@ if loc:
 # as if this feature didn't exist at all.
 REFINE_WINDOW_SECONDS = 900  # generous vs GitHub Actions' own ~10-min cadence
 _lxc_broker_down_ts = {}  # host -> latest down-transition ts within the window
+# 2026-10-01: same idea as _lxc_broker_down_ts above, but for the OTHER
+# end of an incident -- recovery. Before this, a closed incident's end
+# timestamp was always whichever run's own ~10-min-cadence `ts` first
+# saw the recovery (see _build_real_incidents() below), even though
+# the START side had been refined to the LXC's ~25-50s granularity
+# since 2026-09-09. Durations looked precise-ish on one side and
+# rounded-to-10-min on the other. Same fallback guarantee: if the LXC
+# log is unreachable or has nothing recent, this silently falls back
+# to `now`, i.e. today's actual behavior, same as the down-side refine.
+_lxc_broker_up_ts = {}  # host -> latest up-transition ts within the window
 try:
     with urllib.request.urlopen("https://meshbot.rivi.my.id/api/public/broker-log", timeout=8) as resp:
         _lxc_log = json.load(resp).get("log", [])
     _refine_cutoff = now - REFINE_WINDOW_SECONDS
     for _entry in _lxc_log:
-        if _entry.get("status") != "up" and _entry.get("ts", 0) >= _refine_cutoff:
-            _host = _entry.get("host")
-            if _host and _entry["ts"] > _lxc_broker_down_ts.get(_host, 0):
+        if _entry.get("ts", 0) < _refine_cutoff:
+            continue
+        _host = _entry.get("host")
+        if not _host:
+            continue
+        if _entry.get("status") != "up":
+            if _entry["ts"] > _lxc_broker_down_ts.get(_host, 0):
                 _lxc_broker_down_ts[_host] = _entry["ts"]
+        else:
+            if _entry["ts"] > _lxc_broker_up_ts.get(_host, 0):
+                _lxc_broker_up_ts[_host] = _entry["ts"]
 except Exception as e:
     print(f"broker-log refine: fetch failed, falling back to this run's own timing: {e}")
 
@@ -552,12 +569,13 @@ for host in BROKERS:
     confirmed_down = st["current_outage_start"] is not None
     confirmed_auth = st["current_auth_start"] is not None
 
+    recovered_this_run = (_was_confirmed_down and not confirmed_down) or (_was_confirmed_auth and not confirmed_auth)
     if confirmed_down and not _was_confirmed_down:
         reason_txt = st.get("down_reason") or "unknown"
         _ntfy_notify(f"MQTT broker DOWN: {host}", f"Confirmed down ({reason_txt}). https://meshbot.rivi.my.id/", priority="high")
     elif confirmed_auth and not _was_confirmed_auth:
         _ntfy_notify(f"MQTT broker auth error: {host}", "Confirmed auth rejection. https://meshbot.rivi.my.id/", priority="high")
-    elif (_was_confirmed_down and not confirmed_down) or (_was_confirmed_auth and not confirmed_auth):
+    elif recovered_this_run:
         _ntfy_notify(f"MQTT broker recovered: {host}", "Back to Operational.", priority="default")
 
     brokers[host] = {
@@ -569,6 +587,13 @@ for host in BROKERS:
         "current_auth_start": st["current_auth_start"],
         "down_reason": st.get("down_reason") if confirmed_down else None,
         "corroboration_unavailable": st.get("corroboration_unavailable", False),
+        # Refines this incident's END time the same way
+        # current_outage_start already refines its START (see
+        # _lxc_broker_up_ts's own comment above) -- only set on the
+        # exact run that detects the recovery, so _build_real_incidents()
+        # can use it instead of that run's own coarse `ts` when closing
+        # the incident. None on every other run (nothing to refine).
+        "recovery_refined_ts": _lxc_broker_up_ts.get(host, now) if recovered_this_run else None,
     }
 
 save_json(STATE_PATH, state)
@@ -730,13 +755,23 @@ def _build_real_incidents():
                         elif key in open_incident:
                             start = open_incident.pop(key)
                             reason = open_reason.pop(key, None) if kind == "down" else None
+                            # 2026-10-01: prefer this run's own refined
+                            # recovery timestamp (see recovery_refined_ts'
+                            # own comment above) over `ts`, the coarse
+                            # ~10-min-cadence time this run itself
+                            # happened to land at -- same precision
+                            # upgrade `start` already got in 2026-09-09.
+                            # Only "down" carries this field (auth-error
+                            # recovery was never refined; same scope as
+                            # the down-refine feature it mirrors).
+                            end = (b.get("recovery_refined_ts") if kind == "down" else None) or ts
                             lst = incidents[host]
                             if lst and lst[-1]["kind"] == kind and (start - lst[-1]["end"]) <= MERGE_GAP_SECONDS:
-                                lst[-1]["end"] = ts
+                                lst[-1]["end"] = end
                                 if reason:
                                     lst[-1]["reason"] = reason
                             else:
-                                entry = {"kind": kind, "start": start, "end": ts}
+                                entry = {"kind": kind, "start": start, "end": end}
                                 if reason:
                                     entry["reason"] = reason
                                 lst.append(entry)
