@@ -1272,6 +1272,38 @@ maintenance_banner_html = (
     f'<div class="banner info"><span class="banner-icon">\u2139</span>{notice_text}</div>'
     if notice_text else ""
 )
+# sites.json mirrors brokers.json / notice.json: edit the JSON, no code
+# change needed, re-read fresh every run. A list of {"name","url","desc"}
+# community websites shown in their own section; missing file or an empty
+# list just means the section is omitted. Built OUTSIDE the big html
+# f-string for the same reason as maintenance_banner_html above.
+import html as _html
+def _build_sites_html():
+    sites = load_json("sites.json", [])
+    if not isinstance(sites, list):
+        return ""
+    items = []
+    for site in sites:
+        if not isinstance(site, dict):
+            continue
+        url = str(site.get("url", "")).strip()
+        if not url.startswith(("https://", "http://")):
+            continue  # never render javascript:/data: or malformed links
+        name = _html.escape(str(site.get("name") or url))
+        desc = _html.escape(str(site.get("desc", "")))
+        host = _html.escape(url.split("//", 1)[1].split("/", 1)[0])
+        items.append(
+            f'<a class="site-row" href="{_html.escape(url, quote=True)}" target="_blank" rel="noopener">'
+            f'<span class="site-main"><span class="site-name">{name}</span>'
+            + (f'<span class="site-desc">{desc}</span>' if desc else "")
+            + f'</span><span class="site-host">{host} ↗</span></a>'
+        )
+    if not items:
+        return ""
+    return ('<h2 class="section-title">Situs Komunitas</h2>'
+            '<div class="panel">' + "".join(items) + '</div>')
+
+sites_html = _build_sites_html()
 commit_sha = os.environ.get("GITHUB_SHA", "")[:7] or "local"
 
 html = f'''<!doctype html>
@@ -1547,6 +1579,14 @@ html = f'''<!doctype html>
   .uptime-link a:hover {{ text-decoration: underline; }}
 
   .section-title {{ font-size: .95rem; font-weight: 650; margin: 2rem 0 .8rem; letter-spacing: -.1px; }}
+
+  .site-row {{ display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem 1.1rem; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--border-soft); }}
+  .site-row:last-child {{ border-bottom: none; }}
+  .site-row:hover {{ background: var(--surf2); }}
+  .site-main {{ display: flex; flex-direction: column; min-width: 0; }}
+  .site-name {{ font-weight: 600; font-size: .9rem; }}
+  .site-desc {{ color: var(--faint); font-size: .76rem; margin-top: .1rem; }}
+  .site-host {{ color: var(--accent); font-size: .78rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; flex-shrink: 0; }}
   .incident-log {{
     background: var(--surf); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: var(--shadow); overflow: hidden;
@@ -1611,6 +1651,7 @@ html = f'''<!doctype html>
     <div class="panel">{"".join(rows)}</div>
     <h2 class="section-title">Endpoint DNS Failover</h2>
     <div class="panel">{alias_row}</div>
+    {sites_html}
     <h2 class="section-title">Riwayat Insiden</h2>
     <div class="incident-log">{_incident_log_html()}</div>
     <div class="uptime-link full-history-link"><a href="incidents.html">Lihat riwayat insiden lengkap (3 bulan) →</a></div>

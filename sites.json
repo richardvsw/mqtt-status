@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Meshnode.id",
+    "url": "https://meshnode.id",
+    "desc": "Situs utama komunitas"
+  },
+  {
+    "name": "Peta Node MeshNode Indonesia",
+    "url": "https://map.meshnode.id",
+    "desc": "Peta node Meshtastic"
+  },
+  {
+    "name": "Mesh Alfi",
+    "url": "https://mesh.alfi.web.id/",
+    "desc": "Situs komunitas"
+  },
+  {
+    "name": "Meshview Nareswari",
+    "url": "https://meshview.nareswari.net",
+    "desc": "Peta, daftar node & statistik jaringan mesh LoRa"
+  },
+  {
+    "name": "Meshnode-ID Monitor (Mtl-Cbt)",
+    "url": "https://meshid.clusternet.my.id/",
+    "desc": "Monitor jaringan, situs Mtl-Cbt"
+  }
+]
