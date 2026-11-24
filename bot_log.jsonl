@@ -1,8 +1,3 @@
-{"ts": 1787745748.8335168, "checks": {"mesh_bot": "down", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787745868.67594, "checks": {"mesh_bot": "down", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787745988.638105, "checks": {"mesh_bot": "down", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787746108.3727493, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
-{"ts": 1787746228.5410867, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787746349.592832, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787746469.7522824, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
 {"ts": 1787746589.748859, "checks": {"mesh_bot": "up", "meshtasticd": "up", "lxc-monitor": "up"}}
@@ -17806,3 +17801,4 @@
 {"ts": 1795520425.7894142, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
 {"ts": 1795521026.6757805, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
 {"ts": 1795521637.94503, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
+{"ts": 1795522231.9182203, "checks": {"mesh_bot": "up", "meshtasticd": "up", "bot": "up"}}
